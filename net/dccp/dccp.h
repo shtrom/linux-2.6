@@ -456,6 +456,28 @@ extern int dccp_insert_option_timestamp(struct sock *sk,
 extern int dccp_insert_option(struct sock *sk, struct sk_buff *skb,
 			       unsigned char option,
 			       const void *value, unsigned char len);
+#ifdef CONFIG_IP_DCCP_FREEZE
+int dccp_freeze_setup_state(struct sock *sk, int senderonly, enum dccp_freeze_states state);
+
+static inline int dccp_freeze(struct sock *sk, int senderonly)
+{
+	return dccp_freeze_setup_state(sk, senderonly, DCCP_FREEZE_FROZEN);
+}
+static inline int dccp_unfreeze(struct sock *sk, int senderonly)
+{
+	return dccp_freeze_setup_state(sk, senderonly, DCCP_FREEZE_NORMAL);
+}
+
+static inline enum dccp_freeze_states dccp_freeze_get(struct sock *sk)
+{
+	return dccp_sk(sk)->dccps_frozen;
+}
+static inline void dccp_freeze_set(struct sock *sk, enum dccp_freeze_states val) {
+	dccp_sk(sk)->dccps_frozen = val;
+}
+
+extern int dccp_freeze_signal(struct sock *sk);
+#endif
 
 #ifdef CONFIG_SYSCTL
 extern int dccp_sysctl_init(void);

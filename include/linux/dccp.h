@@ -208,8 +208,11 @@ enum dccp_feature_numbers {
 #define DCCP_SOCKOPT_CCID		13
 #define DCCP_SOCKOPT_TX_CCID		14
 #define DCCP_SOCKOPT_RX_CCID		15
+#define DCCP_SOCKOPT_FREEZE		16
 #define DCCP_SOCKOPT_CCID_RX_INFO	128
+#define DCCP_SOCKOPT_CCID_RX_FREEZE	129
 #define DCCP_SOCKOPT_CCID_TX_INFO	192
+#define DCCP_SOCKOPT_CCID_TX_FREEZE	193
 
 /* maximum number of services provided on the same listening port */
 #define DCCP_SERVICE_LIST_MAX_LEN      32

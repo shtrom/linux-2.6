@@ -536,6 +536,14 @@ static int do_dccp_setsockopt(struct sock *sk, int level, int optname,
 	case DCCP_SOCKOPT_RECV_CSCOV:
 		err = dccp_setsockopt_cscov(sk, val, true);
 		break;
+#ifdef CONFIG_IP_DCCP_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		if (val == 0)
+			err = dccp_unfreeze(sk, 0);
+		else
+			err = dccp_freeze(sk, 0);
+		break;
+#endif
 	case 128 ... 191:
 		return ccid_hc_rx_setsockopt(dp->dccps_hc_rx_ccid, sk, optname,
 					     (u32 __user *)optval, optlen);
@@ -649,6 +657,11 @@ static int do_dccp_getsockopt(struct sock *sk, int level, int optname,
 	case DCCP_SOCKOPT_RECV_CSCOV:
 		val = dp->dccps_pcrlen;
 		break;
+#ifdef CONFIG_IP_DCCP_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		val = dccp_freeze_get(sk);;
+		break;
+#endif
 	case 128 ... 191:
 		return ccid_hc_rx_getsockopt(dp->dccps_hc_rx_ccid, sk, optname,
 					     len, (u32 __user *)optval, optlen);
