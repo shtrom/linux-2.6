@@ -165,6 +165,9 @@ enum {
 	DCCPO_TIMESTAMP_ECHO = 42,
 	DCCPO_ELAPSED_TIME = 43,
 	DCCPO_MAX = 45,
+	/* Experimental Freeze-DCCP/TFRC options */
+	DCCPO_FREEZE = 120,
+	DCCPO_UNFREEZE = 121,
 	DCCPO_MIN_CCID_SPECIFIC = 128,
 	DCCPO_MAX_CCID_SPECIFIC = 255,
 };
@@ -424,6 +427,11 @@ static inline int dccp_list_has_service(const struct dccp_service_list *sl,
 	}
 	return 0;
 }
+
+enum dccp_freeze_states {
+	DCCP_FREEZE_NORMAL = 0,
+	DCCP_FREEZE_FROZEN,
+};
 
 struct dccp_ackvec;
 
