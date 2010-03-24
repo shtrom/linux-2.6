@@ -55,6 +55,11 @@ enum ccid3_options {
 	TFRC_OPT_LOSS_EVENT_RATE = 192,
 	TFRC_OPT_LOSS_INTERVALS	 = 193,
 	TFRC_OPT_RECEIVE_RATE	 = 194,
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	TFRC_OPT_UNFROZEN	 = 248,
+	TFRC_OPT_RESTORING,
+	TFRC_OPT_PROBING,
+#endif
 };
 
 struct ccid3_options_received {
@@ -72,6 +77,16 @@ enum ccid3_hc_tx_states {
 	TFRC_SSTATE_FBACK,
 	TFRC_SSTATE_TERM,
 };
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+/* Freeze-TFRC sender states */
+enum ccid3_hc_tx_freeze_states {
+	TFRC_FREEZE_SSTATE_NORMAL = 0,
+	TFRC_FREEZE_SSTATE_FROZEN,
+	TFRC_FREEZE_SSTATE_RESTORING,
+	TFRC_FREEZE_SSTATE_PROBING,
+};
+#endif
 
 /**
  * struct ccid3_hc_tx_sock - CCID3 sender half-connection socket
@@ -93,6 +108,8 @@ enum ccid3_hc_tx_states {
  * @tx_delta:		  Send timer delta (RFC 3448, 4.6) in usecs
  * @tx_hist:		  Packet history
  * @tx_options_received:  Parsed set of retrieved options
+ * @tx_freeze_state:	  Freeze-TFRC state
+ * @tx_freeze_x_recv:	  Xrecv before Freezing
  */
 struct ccid3_hc_tx_sock {
 	struct tfrc_tx_info		tx_tfrc;
@@ -113,6 +130,10 @@ struct ccid3_hc_tx_sock {
 	u32				tx_delta;
 	struct tfrc_tx_hist_entry	*tx_hist;
 	struct ccid3_options_received	tx_options_received;
+#ifdef	CONFIG_IP_DCCP_CCID3_FREEZE
+	enum ccid3_hc_tx_freeze_states	tx_freeze_state;
+	u64				tx_freeze_x_recv;
+#endif
 };
 
 static inline struct ccid3_hc_tx_sock *ccid3_hc_tx_sk(const struct sock *sk)
@@ -128,6 +149,17 @@ enum ccid3_hc_rx_states {
 	TFRC_RSTATE_DATA,
 	TFRC_RSTATE_TERM    = 127,
 };
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+/* Freeze-TFRC sender states */
+enum ccid3_hc_rx_freeze_states {
+	TFRC_FREEZE_RSTATE_NORMAL = 0,
+	TFRC_FREEZE_RSTATE_RESTORATION,
+	TFRC_FREEZE_RSTATE_RECOVERY1,
+	TFRC_FREEZE_RSTATE_RECOVERY2,
+	TFRC_FREEZE_RSTATE_PROBED,
+};
+#endif
 
 /**
  * struct ccid3_hc_rx_sock - CCID3 receiver half-connection socket
@@ -145,6 +177,7 @@ enum ccid3_hc_rx_states {
  * @rx_li_hist:		     Loss Interval database
  * @rx_s:		     Received packet size in bytes
  * @rx_pinv:		     Inverse of Loss Event Rate (RFC 4342, sec. 8.5)
+ * @rx_freeze_state:	     Freeze-TFRC state
  */
 struct ccid3_hc_rx_sock {
 	u8				rx_last_counter:4;
@@ -157,6 +190,9 @@ struct ccid3_hc_rx_sock {
 	struct tfrc_loss_hist		rx_li_hist;
 	u16				rx_s;
 #define rx_pinv				rx_li_hist.i_mean
+#ifdef	CONFIG_IP_DCCP_CCID3_FREEZE
+	enum ccid3_hc_rx_freeze_states	rx_freeze_state;
+#endif
 };
 
 static inline struct ccid3_hc_rx_sock *ccid3_hc_rx_sk(const struct sock *sk)
@@ -165,5 +201,29 @@ static inline struct ccid3_hc_rx_sock *ccid3_hc_rx_sk(const struct sock *sk)
 	BUG_ON(hcrx == NULL);
 	return hcrx;
 }
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+int ccid3_rx_freeze(struct ccid3_hc_rx_sock *hcrx);
+int ccid3_rx_unfreeze(struct ccid3_hc_rx_sock *hcrx);
+
+static inline void ccid3_rx_freeze_set(struct ccid3_hc_rx_sock *hcrx, enum ccid3_hc_rx_freeze_states val) {
+	hcrx->rx_freeze_state = val;
+}
+static inline enum ccid3_hc_rx_freeze_states ccid3_rx_freeze_get(struct ccid3_hc_rx_sock *hcrx)
+{
+	return hcrx->rx_freeze_state;
+}
+
+int ccid3_tx_freeze(struct ccid3_hc_tx_sock *hctx);
+int ccid3_tx_unfreeze(struct ccid3_hc_tx_sock *hctx);
+
+static inline void ccid3_tx_freeze_set(struct ccid3_hc_tx_sock *hctx, enum ccid3_hc_tx_freeze_states val){
+	hctx->tx_freeze_state = val;
+}
+static inline enum ccid3_hc_tx_freeze_states ccid3_tx_freeze_get(struct ccid3_hc_tx_sock *hctx)
+{
+	return hctx->tx_freeze_state;
+}
+#endif
 
 #endif /* _DCCP_CCID3_H_ */

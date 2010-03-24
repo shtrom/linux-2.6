@@ -927,6 +927,11 @@ static int ccid3_hc_tx_setsockopt(struct sock *sk, const int optname,
 
 	/* Options with no arguments */
 	switch (optname) {
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_CCID_TX_FREEZE;
+		err = ccid3_tx_freeze(hctx);
+		break;
+#endif
 	}
 
 	if (optlen < (int)sizeof(int))
@@ -954,6 +959,11 @@ static int ccid3_hc_rx_setsockopt(struct sock *sk, const int optname,
 
 	/* Options with no arguments */
 	switch (optname) {
+#ifdef IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_CCID_RX_FREEZE;
+		err = ccid3_rx_freeze(hcrx);
+		break;
+#endif
 	}
 
 	if (optlen < (int)sizeof(int))
