@@ -271,7 +271,13 @@ void dccp_write_xmit(struct sock *sk, int block)
 		}
 
 		skb_dequeue(&sk->sk_write_queue);
+#ifdef CONFIG_IP_DCCP_FREEZE
+		if (dp->dccps_frozen) {
+			kfree_skb(skb);
+		} else if (err == 0) {
+#else
 		if (err == 0) {
+#endif
 			struct dccp_skb_cb *dcb = DCCP_SKB_CB(skb);
 			const int len = skb->len;
 

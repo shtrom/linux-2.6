@@ -320,6 +320,7 @@ int dccp_insert_option(struct sock *sk, struct sk_buff *skb,
 
 EXPORT_SYMBOL_GPL(dccp_insert_option);
 
+/* Redundancy for packets with the freeze and unfreeze options */
 static int dccp_insert_option_ndp(struct sock *sk, struct sk_buff *skb)
 {
 	struct dccp_sock *dp = dccp_sk(sk);
@@ -501,6 +502,28 @@ int dccp_insert_fn_opt(struct sk_buff *skb, u8 type, u8 feat,
 	return 0;
 }
 
+#ifdef CONFIG_IP_DCCP_FREEZE
+int dccp_insert_option_freeze(struct sk_buff *skb)
+{
+	if (DCCP_SKB_CB(skb)->dccpd_opt_len >= DCCP_MAX_OPT_LEN)
+		return -1;
+
+	DCCP_SKB_CB(skb)->dccpd_opt_len++;
+	*skb_push(skb, 1) = DCCPO_FREEZE;
+	return 0;
+}
+
+int dccp_insert_option_unfreeze(struct sk_buff *skb)
+{
+	if (DCCP_SKB_CB(skb)->dccpd_opt_len >= DCCP_MAX_OPT_LEN)
+		return -1;
+
+	DCCP_SKB_CB(skb)->dccpd_opt_len++;
+	*skb_push(skb, 1) = DCCPO_UNFREEZE;
+	return 0;
+}
+#endif
+
 /* The length of all options needs to be a multiple of 4 (5.8) */
 static void dccp_insert_option_padding(struct sk_buff *skb)
 {
@@ -543,9 +566,23 @@ int dccp_insert_options(struct sock *sk, struct sk_buff *skb)
 		}
 	}
 
+#ifdef IP_DCCP_FREEZE
+	if (dp->dccps_freeze_signal_count > 0) {
+		if (dp->dccps_frozen) {
+			if (dccp_insert_option_freeze(skb))
+				return -1;
+		} else  {
+			if (dccp_insert_option_unfreeze(skb))
+				return -1;
+		}
+		dp->dccps_freeze_signal_count--;
+	}
+#endif
+
 	if (dp->dccps_hc_rx_insert_options) {
 		if (ccid_hc_rx_insert_options(dp->dccps_hc_rx_ccid, sk, skb))
 			return -1;
+		/* Redundancy for packets with the freeze and unfreeze options */
 		dp->dccps_hc_rx_insert_options = 0;
 	}
 
