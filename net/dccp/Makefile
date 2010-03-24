@@ -14,6 +14,8 @@ dccp-$(CONFIG_IP_DCCP_TFRC_LIB) += ccids/lib/tfrc.o		\
 				   ccids/lib/loss_interval.o
 
 obj-$(CONFIG_IP_DCCP_FREEZE) += dccp_freeze.o
+obj-$(CONFIG_IP_DCCP_CCID3_FREEZE) += ccids/ccid3_freeze.o
+
 dccp_ipv4-y := ipv4.o
 
 # build dccp_ipv6 as module whenever either IPv6 or DCCP is a module

@@ -917,7 +917,11 @@ static int ccid3_hc_rx_getsockopt(struct sock *sk, const int optname, int len,
 
 struct ccid_operations ccid3_ops = {
 	.ccid_id		   = DCCPC_CCID3,
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	.ccid_name		   = "TCP-Friendly Rate Control (w/ Freeze support)",
+#else
 	.ccid_name		   = "TCP-Friendly Rate Control",
+#endif
 	.ccid_hc_tx_obj_size	   = sizeof(struct ccid3_hc_tx_sock),
 	.ccid_hc_tx_init	   = ccid3_hc_tx_init,
 	.ccid_hc_tx_exit	   = ccid3_hc_tx_exit,
