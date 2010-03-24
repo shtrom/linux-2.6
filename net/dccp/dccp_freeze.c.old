@@ -1,0 +1,62 @@
+/*
+ * DCCP freezing mechanisms
+ * Copyright (C) 2010 Nicta, Olivier Mehani <olivier.mehani@nicta.com.au>
+ * 
+ * $Id: gplnotice.ab.c 4 2007-06-19 17:36:57Z shtrom $
+ * Generic freezing mechanisms.
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+#include <linux/dccp.h>
+
+#include "ccid.h"
+#include "dccp.h"
+
+int dccp_freeze_setup_state(struct sock *sk, int senderonly, enum dccp_freeze_states state) {
+	int errrx = -EOPNOTSUPP, errtx = -EOPNOTSUPP;
+	struct dccp_sock *dp = dccp_sk(sk);
+
+	if (dccp_freeze_get(sk) == state) {
+		DCCP_WARN("Socket already in freeze state %d", state);
+		return -EINVAL;
+	}
+
+	if (senderonly != 0) 
+		errrx = 0;
+	else if (dp->dccps_hc_rx_ccid->ccid_ops->ccid_can_freeze)
+		errrx = dp->dccps_hc_rx_ccid->ccid_ops->ccid_hc_rx_setsockopt(sk,
+				DCCP_SOCKOPT_FREEZE, (char *)state, sizeof(state)); 
+
+	if (dp->dccps_hc_tx_ccid->ccid_ops->ccid_can_freeze)
+		errtx = dp->dccps_hc_tx_ccid->ccid_ops->ccid_hc_tx_setsockopt(sk,
+				DCCP_SOCKOPT_FREEZE, (char *)state, sizeof(state)); 
+
+	if (errrx && errtx) {
+		DCCP_WARN("Error unfreezing: errrx=%d, errtx=%d\n", errrx, errtx);
+		return -EPROTO;
+	}
+
+	dccp_freeze_set(sk, state);
+
+	return 0;
+}
+
+int dccp_freeze_signal(struct sock *sk)
+{
+	printk(KERN_DEBUG "%s not implemented\n", __FUNCTION__);
+	/* Send sk->dccps_freeze_signal_count DCCPO_FREEZE 
+	 * DCCPO_UNFREEZE packets should be taken care of in the xmit function */
+	return 0;
+}
