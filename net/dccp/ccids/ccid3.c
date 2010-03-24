@@ -927,6 +927,13 @@ static int ccid3_hc_tx_setsockopt(struct sock *sk, const int optname,
 
 	/* Options with no arguments */
 	switch (optname) {
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		err = ccid3_tx_freeze(hctx);
+		break;
+#endif
+	default:
+		break;
 	}
 
 	if (optlen < (int)sizeof(int))
@@ -954,6 +961,11 @@ static int ccid3_hc_rx_setsockopt(struct sock *sk, const int optname,
 
 	/* Options with no arguments */
 	switch (optname) {
+#ifdef IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		err = ccid3_rx_freeze(hcrx);
+		break;
+#endif
 	}
 
 	if (optlen < (int)sizeof(int))
@@ -974,6 +986,11 @@ static int ccid3_hc_rx_setsockopt(struct sock *sk, const int optname,
 struct ccid_operations ccid3_ops = {
 	.ccid_id		   = DCCPC_CCID3,
 	.ccid_name		   = "TCP-Friendly Rate Control",
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	.ccid_can_freeze	   = 1,
+#elif CONFIG_IP_DCCP_FREEZE
+	.ccid_can_freeze	   = 0;
+#endif
 	.ccid_hc_tx_obj_size	   = sizeof(struct ccid3_hc_tx_sock),
 	.ccid_hc_tx_init	   = ccid3_hc_tx_init,
 	.ccid_hc_tx_exit	   = ccid3_hc_tx_exit,

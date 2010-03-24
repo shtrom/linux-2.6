@@ -165,6 +165,9 @@ enum {
 	DCCPO_TIMESTAMP_ECHO = 42,
 	DCCPO_ELAPSED_TIME = 43,
 	DCCPO_MAX = 45,
+	/* Experimental Freeze-DCCP/TFRC options */
+	DCCPO_FREEZE = 120,
+	DCCPO_UNFREEZE = 121,
 	DCCPO_MIN_CCID_SPECIFIC = 128,
 	DCCPO_MAX_CCID_SPECIFIC = 255,
 };
@@ -425,6 +428,11 @@ static inline int dccp_list_has_service(const struct dccp_service_list *sl,
 	return 0;
 }
 
+enum dccp_freeze_states {
+	DCCP_FREEZE_NORMAL = 0,
+	DCCP_FREEZE_FROZEN,
+};
+
 struct dccp_ackvec;
 
 /**
@@ -465,6 +473,8 @@ struct dccp_ackvec;
  * @dccps_server_timewait - server holds timewait state on close (RFC 4340, 8.3)
  * @dccps_xmit_timer - timer for when CCID is not ready to send
  * @dccps_syn_rtt - RTT sample from Request/Response exchange (in usecs)
+ * @dccps_frozen - freeze state boolean indicator (Freeze-DCCP extension)
+ * @dccps_freeze_signal_count - packets to be sent with freeze-signaling options
  */
 struct dccp_sock {
 	/* inet_connection_sock has to be the first member of dccp_sock */
@@ -504,6 +514,8 @@ struct dccp_sock {
 	__u8				dccps_hc_tx_insert_options:1;
 	__u8				dccps_server_timewait:1;
 	struct timer_list		dccps_xmit_timer;
+	enum dccp_freeze_states		dccps_frozen;
+	__u8				dccps_freeze_signal_count;
 };
 
 static inline struct dccp_sock *dccp_sk(const struct sock *sk)

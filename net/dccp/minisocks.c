@@ -112,6 +112,10 @@ struct sock *dccp_create_openreq_child(struct sock *sk,
 		newdp->dccps_service	    = dreq->dreq_service;
 		newdp->dccps_timestamp_echo = dreq->dreq_timestamp_echo;
 		newdp->dccps_timestamp_time = dreq->dreq_timestamp_time;
+#ifdef CONFIG_IP_DCCP_FREEZE
+		newdp->dccps_frozen         = 0;
+		newdp->dccps_freeze_signal_count = 0;
+#endif
 		newicsk->icsk_rto	    = DCCP_TIMEOUT_INIT;
 
 		INIT_LIST_HEAD(&newdp->dccps_featneg);

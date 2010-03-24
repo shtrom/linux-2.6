@@ -52,6 +52,9 @@ struct ccid_operations {
 				*ccid_hc_tx_slab;
 	__u32			ccid_hc_rx_obj_size,
 				ccid_hc_tx_obj_size;
+#if CONFIG_IP_DCCP_FREEZE
+	__u8			ccid_can_freeze;
+#endif
 	/* Interface Routines */
 	int		(*ccid_hc_rx_init)(struct ccid *ccid, struct sock *sk);
 	int		(*ccid_hc_tx_init)(struct ccid *ccid, struct sock *sk);

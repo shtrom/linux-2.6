@@ -766,6 +766,9 @@ static void ccid2_hc_rx_packet_recv(struct sock *sk, struct sk_buff *skb)
 struct ccid_operations ccid2_ops = {
 	.ccid_id		= DCCPC_CCID2,
 	.ccid_name		= "TCP-like",
+#if CONFIG_IP_DCCP_FREEZE
+	.ccid_can_freeze	 = 0,
+#endif
 	.ccid_hc_tx_obj_size	= sizeof(struct ccid2_hc_tx_sock),
 	.ccid_hc_tx_init	= ccid2_hc_tx_init,
 	.ccid_hc_tx_exit	= ccid2_hc_tx_exit,

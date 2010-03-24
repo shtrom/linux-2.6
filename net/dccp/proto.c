@@ -1124,6 +1124,10 @@ static int __init dccp_init(void)
 		INIT_HLIST_HEAD(&dccp_hashinfo.bhash[i].chain);
 	}
 
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	pr_info("Freeze-DCCP/TFRC support\n");
+#endif
+
 	rc = dccp_mib_init();
 	if (rc)
 		goto out_free_dccp_bhash;
