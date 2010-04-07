@@ -103,6 +103,7 @@ enum {
 #define TCP_CONGESTION		13	/* Congestion control algorithm */
 #define TCP_MD5SIG		14	/* TCP MD5 Signature (RFC2385) */
 #define TCP_COOKIE_TRANSACTIONS	15	/* TCP Cookie Transactions */
+#define TCP_FREEZE		16	/* Freeze-TCP */
 
 /* for TCP_INFO socket option */
 #define TCPI_OPT_TIMESTAMPS	1
@@ -454,6 +455,10 @@ struct tcp_sock {
 	 * contains related tcp_cookie_transactions fields.
 	 */
 	struct tcp_cookie_values  *cookie_values;
+
+#ifdef CONFIG_TCP_FREEZE
+	int			frozen;
+#endif
 };
 
 static inline struct tcp_sock *tcp_sk(const struct sock *sk)

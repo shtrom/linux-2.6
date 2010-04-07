@@ -2338,6 +2338,12 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 		break;
 #endif
 
+#ifdef CONFIG_TCP_FREEZE
+	case TCP_FREEZE:
+		err = tcp_set_freeze(tp, val);
+		break;
+#endif
+
 	default:
 		err = -ENOPROTOOPT;
 		break;
@@ -2551,6 +2557,13 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 			return -EFAULT;
 		return 0;
 	}
+
+#ifdef CONFIG_TCP_FREEZE
+	case TCP_FREEZE:
+		val = tcp_get_freeze(tp);
+		break;
+#endif
+
 	default:
 		return -ENOPROTOOPT;
 	}
@@ -3228,6 +3241,9 @@ void __init tcp_init(void)
 	printk(KERN_INFO "TCP: Hash tables configured "
 	       "(established %u bind %u)\n",
 	       tcp_hashinfo.ehash_mask + 1, tcp_hashinfo.bhash_size);
+#ifdef CONFIG_TCP_FREEZE
+	printk(KERN_INFO "TCP: support for freezing using ZWA\n");
+#endif
 
 	tcp_register_congestion_control(&tcp_reno);
 

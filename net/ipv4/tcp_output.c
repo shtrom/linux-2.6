@@ -251,6 +251,11 @@ static u16 tcp_select_window(struct sock *sk)
 	u32 cur_win = tcp_receive_window(tp);
 	u32 new_win = __tcp_select_window(sk);
 
+#ifdef CONFIG_TCP_FREEZE
+	if (unlikely(tp->frozen == 1))
+		cur_win = new_win = 0;
+#endif
+
 	/* Never shrink the offered window */
 	if (new_win < cur_win) {
 		/* Danger Will Robinson!

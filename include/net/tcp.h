@@ -556,6 +556,10 @@ static inline void tcp_fast_path_check(struct sock *sk)
 		tcp_fast_path_on(tp);
 }
 
+/* tcp_freeze.c */
+extern int tcp_set_freeze(struct tcp_sock *sk, int val);
+extern int tcp_get_freeze(struct tcp_sock *sk);
+
 /* Compute the actual rto_min value */
 static inline u32 tcp_rto_min(struct sock *sk)
 {

@@ -419,6 +419,29 @@ config INET_TCP_DIAG
 	depends on INET_DIAG
 	def_tristate INET_DIAG
 
+config TCP_FREEZE
+	bool "TCP: Freeze-TCP"
+	depends on EXPERIMENTAL
+	default n
+	help
+	  Support for Freeze-TCP [0] to temporarily freeze the remote sender.
+	  The receiver can send a Zero-Window Advertizement to suspend the
+	  remote peer's sender. This can be used e.g. when the receiver is
+	  mobile and predicts a disconnection to avoid losing packets.
+
+	  [0] T. Goff, J. Moronski, D. S. Phatak, and V. Gupta, "Freeze-TCP: a
+	  True End-to-end TCP Enhancement Mechanism for Mobile Environments,"
+	  In Proceedings of IEEE INFOCOM 2000.
+
+	  If unsure, say N.
+
+config TCP_FREEZE_DEBUG
+	bool "TCP: Freeze-TCP debug messages"
+	depends on TCP_FREEZE
+	default n
+	help
+	  Support for debug messages for Freeze-TCP.
+
 menuconfig TCP_CONG_ADVANCED
 	bool "TCP: advanced congestion control"
 	---help---
