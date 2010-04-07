@@ -252,7 +252,8 @@ static u16 tcp_select_window(struct sock *sk)
 	u32 new_win = __tcp_select_window(sk);
 
 #ifdef CONFIG_TCP_FREEZE
-	if (unlikely(tp->frozen == 1))
+	if (unlikely(tp->frozen == 1) ||
+	    unlikely(tcp_freeze_status_global == 1))
 		cur_win = new_win = 0;
 #endif
 
@@ -816,6 +817,11 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
 	tp = tcp_sk(sk);
 	tcb = TCP_SKB_CB(skb);
 	memset(&opts, 0, sizeof(opts));
+	
+#ifdef CONFIG_TCP_FREEZE
+	if (tp->frozen != tcp_freeze_status_global)
+		tcp_set_freeze(tp, tcp_freeze_status_global);
+#endif
 
 	if (unlikely(tcb->flags & TCPCB_FLAG_SYN))
 		tcp_options_size = tcp_syn_options(sk, skb, &opts, &md5);
@@ -1738,6 +1744,11 @@ static int tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 	while ((skb = tcp_send_head(sk))) {
 		unsigned int limit;
+		
+#ifdef CONFIG_TCP_FREEZE
+		if (tp->frozen != tcp_freeze_status_global)
+			tcp_set_freeze(tp, tcp_freeze_status_global);
+#endif
 
 		tso_segs = tcp_init_tso_segs(sk, skb, mss_now);
 		BUG_ON(!tso_segs);

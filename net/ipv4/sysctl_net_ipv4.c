@@ -118,6 +118,28 @@ static int proc_allowed_congestion_control(ctl_table *ctl,
 	return ret;
 }
 
+#ifdef CONFIG_TCP_FREEZE
+static int proc_tcp_freeze_global(ctl_table *ctl, int write, 
+						void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	char val[sizeof(int)];
+	ctl_table tbl = {
+		.data = val,
+		.maxlen = sizeof(int),
+	};
+	int ret;
+
+	tcp_get_global_freeze_status(val);
+
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
+	
+	if (write && ret == 0)
+		ret = tcp_set_global_freeze_status(val);
+		
+	return ret;
+}
+#endif
+
 static struct ctl_table ipv4_table[] = {
 	{
 		.procname	= "tcp_timestamps",
@@ -561,6 +583,15 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler   = proc_allowed_congestion_control,
 	},
+#ifdef CONFIG_TCP_FREEZE
+	{
+		.procname	= "tcp_freeze_global",
+		.data		= &tcp_freeze_status_global,
+		.mode		= 0644,
+		.maxlen		= sizeof(int),
+		.proc_handler	= proc_tcp_freeze_global,
+	},
+#endif
 	{
 		.procname	= "tcp_max_ssthresh",
 		.data		= &sysctl_tcp_max_ssthresh,

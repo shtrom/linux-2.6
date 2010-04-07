@@ -502,7 +502,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct request_sock *req,
 #endif
 
 #ifdef CONFIG_TCP_FREEZE
-		newtp->frozen = 0;
+		newtp->frozen = tcp_freeze_status_global;
 #endif
 		if (skb->len >= TCP_MSS_DEFAULT + newtp->tcp_header_len)
 			newicsk->icsk_ack.last_seg_size = skb->len - newtp->tcp_header_len;

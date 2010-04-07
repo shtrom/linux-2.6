@@ -1294,6 +1294,12 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	if (sk->sk_state == TCP_LISTEN)
 		return -ENOTCONN;
 	while ((skb = tcp_recv_skb(sk, seq, &offset)) != NULL) {
+	
+#ifdef CONFIG_TCP_FREEZE
+		if (tp->frozen != tcp_freeze_status_global)
+			tcp_set_freeze(tp, tcp_freeze_status_global);
+#endif
+
 		if (offset < skb->len) {
 			int used;
 			size_t len;
@@ -1369,6 +1375,11 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	int copied_early = 0;
 	struct sk_buff *skb;
 	u32 urg_hole = 0;
+	
+#ifdef CONFIG_TCP_FREEZE
+	if (tp->frozen != tcp_freeze_status_global)
+		tcp_set_freeze(tp, tcp_freeze_status_global);
+#endif
 
 	lock_sock(sk);
 

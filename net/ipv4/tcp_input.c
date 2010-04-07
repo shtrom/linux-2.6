@@ -5218,6 +5218,11 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 	struct tcp_sock *tp = tcp_sk(sk);
 	int res;
 
+#ifdef CONFIG_TCP_FREEZE
+	if (tp->frozen != tcp_freeze_status_global)
+		tcp_set_freeze(tp, tcp_freeze_status_global);
+#endif
+
 	/*
 	 *	Header prediction.
 	 *	The code loosely follows the one in the famous
