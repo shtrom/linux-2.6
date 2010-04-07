@@ -3425,6 +3425,13 @@ static int tcp_ack_update_window(struct sock *sk, struct sk_buff *skb, u32 ack,
 	int flag = 0;
 	u32 nwin = ntohs(tcp_hdr(skb)->window);
 
+#ifdef CONFIG_TCP_FREEZE
+	/* Sender side fix for implementation of Freeze TCP
+	 * (originally from Francis Chai's patch */
+	if (nwin < 0)
+		tp->snd_wnd = 0;
+#endif 
+
 	if (likely(!tcp_hdr(skb)->syn))
 		nwin <<= tp->rx_opt.snd_wscale;
 
