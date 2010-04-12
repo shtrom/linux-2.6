@@ -1,5 +1,4 @@
 menu "DCCP CCIDs Configuration (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
 
 config IP_DCCP_CCID2_DEBUG
 	bool "CCID-2 debugging messages"
@@ -12,7 +11,7 @@ config IP_DCCP_CCID2_DEBUG
 	  If in doubt, say N.
 
 config IP_DCCP_CCID3
-	bool "CCID-3 (TCP-Friendly) (EXPERIMENTAL)"
+	bool "CCID-3 (TCP-Friendly)"
 	def_bool y if (IP_DCCP = y || IP_DCCP = m)
 	---help---
 	  CCID-3 denotes TCP-Friendly Rate Control (TFRC), an equation-based
@@ -36,9 +35,9 @@ config IP_DCCP_CCID3
 
 	  If in doubt, say N.
 
+if IP_DCCP_CCID3
 config IP_DCCP_CCID3_DEBUG
 	bool "CCID-3 debugging messages"
-	depends on IP_DCCP_CCID3
 	---help---
 	  Enable CCID-3 specific debugging messages.
 
@@ -77,6 +76,7 @@ config IP_DCCP_CCID3_RTO
 	  The purpose of the nofeedback timer is to slow DCCP down when there
 	  is serious network congestion: experimenting with larger values should
 	  therefore not be performed on WANs.
+endif	# IP_DCCP_CCID3
 
 config IP_DCCP_TFRC_LIB
 	def_bool y if IP_DCCP_CCID3
