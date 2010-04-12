@@ -45,6 +45,7 @@ struct ccid2_seq {
  * @tx_lastrtt:		     time RTT was last measured
  * @tx_rpseq:		     last consecutive seqno
  * @tx_rpdupack:	     dupacks since rpseq
+ * @tx_av_chunks:	     list of Ack Vectors received on current skb
  */
 struct ccid2_hc_tx_sock {
 	u32			tx_cwnd;
@@ -64,6 +65,7 @@ struct ccid2_hc_tx_sock {
 	int			tx_rpdupack;
 	unsigned long		tx_last_cong;
 	u64			tx_high_ack;
+	struct list_head	tx_av_chunks;
 };
 
 static inline bool ccid2_cwnd_network_limited(struct ccid2_hc_tx_sock *hc)
