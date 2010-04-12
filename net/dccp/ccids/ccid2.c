@@ -123,12 +123,9 @@ static int ccid2_hc_tx_alloc_seq(struct ccid2_hc_tx_sock *hc)
 
 static int ccid2_hc_tx_send_packet(struct sock *sk, struct sk_buff *skb)
 {
-	struct ccid2_hc_tx_sock *hc = ccid2_hc_tx_sk(sk);
-
-	if (hc->tx_pipe < hc->tx_cwnd)
-		return 0;
-
-	return 1; /* XXX CCID should dequeue when ready instead of polling */
+	if (ccid2_cwnd_network_limited(ccid2_hc_tx_sk(sk)))
+		return CCID_PACKET_WILL_DEQUEUE_LATER;
+	return CCID_PACKET_SEND_AT_ONCE;
 }
 
 static void ccid2_change_l_ack_ratio(struct sock *sk, u32 val)
@@ -168,6 +165,7 @@ static void ccid2_hc_tx_rto_expire(unsigned long data)
 {
 	struct sock *sk = (struct sock *)data;
 	struct ccid2_hc_tx_sock *hc = ccid2_hc_tx_sk(sk);
+	const bool sender_was_blocked = ccid2_cwnd_network_limited(hc);
 	long s;
 
 	bh_lock_sock(sk);
@@ -187,8 +185,6 @@ static void ccid2_hc_tx_rto_expire(unsigned long data)
 	if (s > 60)
 		hc->tx_rto = 60 * HZ;
 
-	ccid2_start_rto_timer(sk);
-
 	/* adjust pipe, cwnd etc */
 	hc->tx_ssthresh = hc->tx_cwnd / 2;
 	if (hc->tx_ssthresh < 2)
@@ -205,6 +201,11 @@ static void ccid2_hc_tx_rto_expire(unsigned long data)
 	hc->tx_rpdupack = -1;
 	ccid2_change_l_ack_ratio(sk, 1);
 	ccid2_hc_tx_check_sanity(hc);
+
+	/* if we were blocked before, we may now send cwnd=1 packet */
+	if (sender_was_blocked)
+		tasklet_schedule(&dccp_sk(sk)->dccps_xmitlet);
+	ccid2_start_rto_timer(sk);
 out:
 	bh_unlock_sock(sk);
 	sock_put(sk);
@@ -502,6 +503,7 @@ static void ccid2_hc_tx_packet_recv(struct sock *sk, struct sk_buff *skb)
 {
 	struct dccp_sock *dp = dccp_sk(sk);
 	struct ccid2_hc_tx_sock *hc = ccid2_hc_tx_sk(sk);
+	const bool sender_was_blocked = ccid2_cwnd_network_limited(hc);
 	u64 ackno, seqno;
 	struct ccid2_seq *seqp;
 	unsigned char *vector;
@@ -696,6 +698,10 @@ static void ccid2_hc_tx_packet_recv(struct sock *sk, struct sk_buff *skb)
 	}
 
 	ccid2_hc_tx_check_sanity(hc);
+
+	/* check if incoming Acks allow pending packets to be sent */
+	if (sender_was_blocked && !ccid2_cwnd_network_limited(hc))
+		tasklet_schedule(&dccp_sk(sk)->dccps_xmitlet);
 }
 
 static int ccid2_hc_tx_init(struct ccid *ccid, struct sock *sk)
