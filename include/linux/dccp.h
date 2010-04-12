@@ -233,6 +233,9 @@ enum dccp_packet_dequeueing_policy {
 /* maximum number of services provided on the same listening port */
 #define DCCP_SERVICE_LIST_MAX_LEN      32
 
+/* DCCP base time resolution - 10 microseconds (RFC 4340, 13.1 ... 13.3) */
+#define DCCP_TIME_RESOLUTION	10
+
 #ifdef __KERNEL__
 
 #include <linux/in.h>
