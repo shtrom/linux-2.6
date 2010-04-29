@@ -57,6 +57,8 @@ void tfrc_lh_cleanup(struct tfrc_loss_hist *lh)
 					lh->ring[LIH_INDEX(lh->counter)]);
 			lh->ring[LIH_INDEX(lh->counter)] = NULL;
 		}
+
+	lh->counter = 0;
 }
 
 static void tfrc_lh_calc_i_mean(struct tfrc_loss_hist *lh)

@@ -136,7 +136,11 @@ static void ccid3_hc_tx_update_x(struct sock *sk, ktime_t *stamp)
 	 * a sender is idle if it has not sent anything over a 2-RTT-period.
 	 * For consistency with X and X_recv, min_rate is also scaled by 2^6.
 	 */
-	if (ccid3_hc_tx_idle_rtt(hc, now) >= 2) {
+	if (ccid3_hc_tx_idle_rtt(hc, now) >= 2
+#ifdef CONFIG_IP_DCCP_CCID3_DEBUG
+			|| ccid3_tx_freeze_get(hc) == TFRC_FREEZE_SSTATE_PROBING
+#endif
+	   ) {
 		min_rate = rfc3390_initial_rate(sk);
 		min_rate = max(min_rate, 2 * hc->tx_x_recv);
 	}
@@ -353,6 +357,35 @@ static int ccid3_hc_tx_send_packet(struct sock *sk, struct sk_buff *skb)
 	dp->dccps_hc_tx_insert_options = 1;
 	DCCP_SKB_CB(skb)->dccpd_ccval  = hc->tx_last_win_count;
 
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	switch (hc->tx_freeze_state) {
+	case TFRC_FREEZE_SSTATE_NORMAL:
+		if (dp->dccps_signal_freeze > 0)  {
+			if (dccp_insert_option(sk, skb, DCCPO_UNFREEZE, NULL, 0))
+				return -1;
+			dp->dccps_signal_freeze--;
+		}
+		break;
+	case TFRC_FREEZE_SSTATE_FROZEN:
+		if (dp->dccps_signal_freeze <= 0) 
+			return -EAGAIN;
+		else {
+			if (dccp_insert_option(sk, skb, DCCPO_FREEZE, NULL, 0))
+				return -1;
+			dp->dccps_signal_freeze--;
+		}
+		break;
+	case TFRC_FREEZE_SSTATE_RESTORING:
+		if (dccp_insert_option(sk, skb, TFRC_OPT_RESTORING, NULL, 0))
+			return -1;
+		break;
+	case TFRC_FREEZE_SSTATE_PROBING:
+		if(dccp_insert_option(sk, skb, TFRC_OPT_PROBING, NULL, 0))
+			return -1;
+		break;
+	}
+#endif
+
 	/* set the nominal send time for the next following packet */
 	hc->tx_t_nom = ktime_add_us(hc->tx_t_nom, hc->tx_t_ipi);
 	return 0;
@@ -375,7 +408,7 @@ static void ccid3_hc_tx_packet_recv(struct sock *sk, struct sk_buff *skb)
 	struct ccid3_hc_tx_options_received *opt_recv;
 	ktime_t now;
 	unsigned long t_nfb;
-	u32 pinv, r_sample;
+	u32 p, pinv, r_sample;
 
 	/* we are only interested in ACKs */
 	if (!(DCCP_SKB_CB(skb)->dccpd_type == DCCP_PKT_ACK ||
@@ -389,6 +422,20 @@ static void ccid3_hc_tx_packet_recv(struct sock *sk, struct sk_buff *skb)
 	opt_recv = &hc->tx_options_received;
 	now = ktime_get_real();
 
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	switch(opt_recv->ccid3or_receiver_freeze) {
+	case DCCPO_FREEZE:
+		ccid3_tx_freeze(hc);
+		break;
+	case DCCPO_UNFREEZE:
+		ccid3_tx_unfreeze(hc);
+		break;
+	case TFRC_OPT_UNFROZEN:
+		ccid3_tx_receiver_unfrozen(hc);
+		break;
+	}
+#endif
+
 	/* Estimate RTT from history if ACK number is valid */
 	r_sample = tfrc_tx_hist_rtt(hc->tx_hist,
 				    DCCP_SKB_CB(skb)->dccpd_ack_seq, now);
@@ -400,15 +447,33 @@ static void ccid3_hc_tx_packet_recv(struct sock *sk, struct sk_buff *skb)
 	}
 
 	/* Update receive rate in units of 64 * bytes/second */
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	if (ccid3_tx_freeze_get(hc) != TFRC_FREEZE_SSTATE_RESTORING) {
+		hc->tx_x_recv = opt_recv->ccid3or_receive_rate;
+		hc->tx_x_recv <<= 6;
+	}
+#else
 	hc->tx_x_recv = opt_recv->ccid3or_receive_rate;
 	hc->tx_x_recv <<= 6;
+#endif
 
 	/* Update loss event rate (which is scaled by 1e6) */
 	pinv = opt_recv->ccid3or_loss_event_rate;
 	if (pinv == ~0U || pinv == 0)	       /* see RFC 4342, 8.5   */
 		hc->tx_p = 0;
-	else				       /* can not exceed 100% */
-		hc->tx_p = scaled_div(1, pinv);
+	else {				       /* can not exceed 100% */
+		p = scaled_div(1, pinv);
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+		if (p > hc->tx_p ||
+				(ccid3_tx_freeze_get(hc) == TFRC_FREEZE_SSTATE_PROBING && 
+				p - hc->tx_p > FREEZE_DELTA_P * p)) {
+			ccid3_tx_freeze_set(hc, TFRC_FREEZE_SSTATE_NORMAL);
+			ccid3_pr_debug("p has increased or varied more than Dp, resuming unfrozen mode");
+		}
+#endif
+		hc->tx_p = p;
+	}
+
 	/*
 	 * Validate new RTT sample and update moving average
 	 */
@@ -501,6 +566,9 @@ static int ccid3_hc_tx_parse_options(struct sock *sk, unsigned char option,
 		opt_recv->ccid3or_loss_intervals_len = 0;
 		opt_recv->ccid3or_receive_rate	     = 0;
 	}
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	opt_recv->ccid3or_receiver_freeze = 0;
+#endif
 
 	switch (option) {
 	case TFRC_OPT_LOSS_EVENT_RATE:
@@ -539,6 +607,16 @@ static int ccid3_hc_tx_parse_options(struct sock *sk, unsigned char option,
 				       opt_recv->ccid3or_receive_rate);
 		}
 		break;
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case DCCPO_FREEZE:
+	case DCCPO_UNFREEZE:
+	case TFRC_OPT_UNFROZEN:
+		if (opt_recv->ccid3or_receiver_freeze != 0) {
+			DCCP_WARN("CCID3 peer receiver sends several freeze options at once");
+		}
+		opt_recv->ccid3or_receiver_freeze = option;
+		break;
+#endif
 	}
 
 	return rc;
@@ -550,6 +628,10 @@ static int ccid3_hc_tx_init(struct ccid *ccid, struct sock *sk)
 
 	hc->tx_state = TFRC_SSTATE_NO_SENT;
 	hc->tx_hist  = NULL;
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	ccid3_tx_freeze_set(hc, TFRC_FREEZE_SSTATE_NORMAL);
+	hc->tx_freeze_x_recv = 0;
+#endif
 	setup_timer(&hc->tx_no_feedback_timer,
 			ccid3_hc_tx_no_feedback_timer, (unsigned long)sk);
 	return 0;
@@ -582,6 +664,9 @@ static int ccid3_hc_tx_getsockopt(struct sock *sk, const int optname, int len,
 				  u32 __user *optval, int __user *optlen)
 {
 	const struct ccid3_hc_tx_sock *hc;
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	 enum dccp_freeze_states freeze_state = DCCP_FREEZE_NORMAL;
+#endif
 	const void *val;
 
 	/* Listen socks doesn't have a private CCID block */
@@ -596,6 +681,16 @@ static int ccid3_hc_tx_getsockopt(struct sock *sk, const int optname, int len,
 		len = sizeof(hc->tx_tfrc);
 		val = &hc->tx_tfrc;
 		break;
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_CCID_TX_FREEZE:
+		if (len < sizeof(enum dccp_freeze_states))
+			return -EINVAL;
+		if(ccid3_tx_freeze_get(hc) != TFRC_FREEZE_SSTATE_NORMAL)
+			freeze_state = DCCP_FREEZE_FROZEN;
+		len = sizeof(enum dccp_freeze_states);
+		val = &freeze_state;
+		break;
+#endif
 	default:
 		return -ENOPROTOOPT;
 	}
@@ -720,7 +815,38 @@ static int ccid3_hc_rx_insert_options(struct sock *sk, struct sk_buff *skb)
 			       &pinv, sizeof(pinv)) ||
 	    dccp_insert_option(sk, skb, TFRC_OPT_RECEIVE_RATE,
 			       &x_recv, sizeof(x_recv)))
-		return -1;
+	    	return -1;
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	switch (hc->rx_freeze_state) {
+	case TFRC_FREEZE_RSTATE_NORMAL:
+		break;
+	case TFRC_FREEZE_RSTATE_SIGNAL_FREEZE:
+		if (dp->dccps_signal_freeze <= 0) 
+			return -EAGAIN;
+		else {
+			if (dccp_insert_option(sk, skb, DCCPO_FREEZE, NULL, 0))
+				return -1;
+			dp->dccps_signal_freeze--;
+		}
+		break;
+	case TFRC_FREEZE_RSTATE_SIGNAL_UNFREEZE:
+		if (dp->dccps_signal_freeze > 0)  {
+			if (dccp_insert_option(sk, skb, DCCPO_UNFREEZE, NULL, 0))
+				return -1;
+			dp->dccps_signal_freeze--;
+		}
+		break;
+	case TFRC_FREEZE_RSTATE_RESTORATION:
+		break;
+	case TFRC_FREEZE_RSTATE_RECOVERY1:
+		if(dccp_insert_option(sk, skb, TFRC_OPT_UNFROZEN, NULL, 0))
+			return -1;
+	case TFRC_FREEZE_RSTATE_RECOVERY2:
+	case TFRC_FREEZE_RSTATE_PROBED:
+		break;
+	}
+#endif
 
 	return 0;
 }
@@ -770,6 +896,7 @@ static void ccid3_hc_rx_packet_recv(struct sock *sk, struct sk_buff *skb)
 {
 	struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
 	struct ccid3_hc_rx_options_received *opt_recv;
+	ktime_t now;
 	enum ccid3_fback_type do_feedback = CCID3_FBACK_NONE;
 	const u64 ndp = dccp_sk(sk)->dccps_options_received.dccpor_ndp;
 	const bool is_data_packet = dccp_data_packet(skb);
@@ -790,6 +917,33 @@ static void ccid3_hc_rx_packet_recv(struct sock *sk, struct sk_buff *skb)
 	}
 
 	opt_recv = &hc->rx_options_received;
+	now = ktime_get_real();
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	switch(ccid3_rx_freeze_get(hc)) {
+	case TFRC_FREEZE_RSTATE_NORMAL:
+	case TFRC_FREEZE_RSTATE_SIGNAL_FREEZE:
+	case TFRC_FREEZE_RSTATE_SIGNAL_UNFREEZE:
+		if (opt_recv->ccid3or_sender_freeze == TFRC_OPT_RESTORING)
+			ccid3_rx_sender_restoring(hc, now);
+		break;
+	case TFRC_FREEZE_RSTATE_RESTORATION:
+		ccid3_rx_check_restoration_finished(hc, now);
+		break;
+	case TFRC_FREEZE_RSTATE_RECOVERY1:
+		if (opt_recv->ccid3or_sender_freeze == TFRC_OPT_PROBING)
+			ccid3_rx_sender_probing(hc);
+		break;
+	case TFRC_FREEZE_RSTATE_RECOVERY2:
+		if (opt_recv->ccid3or_sender_freeze != TFRC_OPT_RESTORING)
+			ccid3_rx_freeze_set(hc, TFRC_FREEZE_RSTATE_NORMAL);
+		break;
+	case TFRC_FREEZE_RSTATE_PROBED:
+		if (opt_recv->ccid3or_sender_freeze != TFRC_OPT_PROBING)
+			ccid3_rx_freeze_set(hc, TFRC_FREEZE_RSTATE_NORMAL);
+		break;
+	}
+#endif
 
 	if (tfrc_rx_hist_duplicate(&hc->rx_hist, skb))
 		return; /* done receiving */
@@ -839,6 +993,22 @@ static void ccid3_hc_rx_packet_recv(struct sock *sk, struct sk_buff *skb)
 		do_feedback = CCID3_FBACK_PARAM_CHANGE;
 	}
 
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	if (ccid3_rx_freeze_get(hc) == TFRC_FREEZE_RSTATE_PROBED && 
+			do_feedback == CCID3_FBACK_PARAM_CHANGE) {
+		/* First error while probed, recompute p from scratch */
+		tfrc_rx_hist_purge(&hc->rx_hist);
+		tfrc_lh_cleanup(&hc->rx_li_hist);
+
+		tfrc_lh_init(&hc->rx_li_hist);
+		if (tfrc_rx_hist_alloc(&hc->rx_hist) < 0)
+			DCCP_WARN("CCID3 receiver: not enough space to reallocate packet history, things will go wrong soon");
+
+		tfrc_lh_update_i_mean(&hc->rx_li_hist, skb);
+		ccid3_rx_freeze_set(hc, TFRC_FREEZE_RSTATE_NORMAL);
+	}
+#endif
+
 	/*
 	 * Check if the periodic once-per-RTT feedback is due; RFC 4342, 10.3
 	 */
@@ -864,8 +1034,20 @@ static int ccid3_hc_rx_parse_options(struct sock *sk, unsigned char option,
 	/* __be32 opt_val; */
 
 	opt_recv = &hc->rx_options_received;
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	opt_recv->ccid3or_sender_freeze = 0;
+#endif
 
 	switch (option) {
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case TFRC_OPT_RESTORING:
+	case TFRC_OPT_PROBING:
+		if (opt_recv->ccid3or_sender_freeze != 0) {
+			DCCP_WARN("CCID3 peer sender sends several freeze options at once");
+		}
+		opt_recv->ccid3or_sender_freeze = option;
+		break;
+#endif
 	}
 
 	return rc;
@@ -877,6 +1059,9 @@ static int ccid3_hc_rx_init(struct ccid *ccid, struct sock *sk)
 
 	hc->rx_state = TFRC_RSTATE_NO_DATA;
 	tfrc_lh_init(&hc->rx_li_hist);
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	ccid3_rx_freeze_set(hc, TFRC_FREEZE_RSTATE_NORMAL);
+#endif
 	return tfrc_rx_hist_alloc(&hc->rx_hist);
 }
 
@@ -909,6 +1094,9 @@ static int ccid3_hc_rx_getsockopt(struct sock *sk, const int optname, int len,
 {
 	const struct ccid3_hc_rx_sock *hc;
 	struct tfrc_rx_info rx_info;
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	 enum dccp_freeze_states freeze_state = DCCP_FREEZE_NORMAL;
+#endif
 	const void *val;
 
 	/* Listen socks doesn't have a private CCID block */
@@ -927,6 +1115,16 @@ static int ccid3_hc_rx_getsockopt(struct sock *sk, const int optname, int len,
 		len = sizeof(rx_info);
 		val = &rx_info;
 		break;
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_CCID_RX_FREEZE:
+		if (len < sizeof(enum dccp_freeze_states))
+			return -EINVAL;
+		if(ccid3_rx_freeze_get(hc) != TFRC_FREEZE_RSTATE_NORMAL)
+			freeze_state = DCCP_FREEZE_FROZEN;
+		len = sizeof(enum dccp_freeze_states);
+		val = &freeze_state;
+		break;
+#endif
 	default:
 		return -ENOPROTOOPT;
 	}
@@ -958,6 +1156,14 @@ static int ccid3_hc_tx_setsockopt(struct sock *sk, const int optname,
 		return -EFAULT;
 
 	switch (optname) {
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		if((enum dccp_freeze_states) val == DCCP_FREEZE_NORMAL)
+			err = ccid3_tx_unfreeze(hctx);
+		else
+			err =  ccid3_tx_freeze(hctx);
+		break;
+#endif
 	default:
 		return -ENOPROTOOPT;
 		break;
@@ -987,6 +1193,14 @@ static int ccid3_hc_rx_setsockopt(struct sock *sk, const int optname,
 		return -EFAULT;
 
 	switch (optname) {
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		if((enum dccp_freeze_states) val == DCCP_FREEZE_NORMAL)
+			err = ccid3_rx_unfreeze(hcrx);
+		else
+			err = ccid3_rx_freeze(hcrx);
+		break;
+#endif
 	default:
 		return -ENOPROTOOPT;
 		break;
@@ -997,7 +1211,11 @@ static int ccid3_hc_rx_setsockopt(struct sock *sk, const int optname,
 
 struct ccid_operations ccid3_ops = {
 	.ccid_id		   = DCCPC_CCID3,
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	.ccid_name		   = "TCP-Friendly Rate Control (w/ Freeze support)",
+#else
 	.ccid_name		   = "TCP-Friendly Rate Control",
+#endif
 	.ccid_hc_tx_obj_size	   = sizeof(struct ccid3_hc_tx_sock),
 	.ccid_hc_tx_init	   = ccid3_hc_tx_init,
 	.ccid_hc_tx_exit	   = ccid3_hc_tx_exit,
