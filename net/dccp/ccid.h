@@ -44,6 +44,7 @@ struct tcp_info;
  *  @ccid_hc_tx_packet_sent: does accounting for packets in flight by HC-sender
  *  @ccid_hc_{r,t}x_get_info: INET_DIAG information for HC-receiver/sender
  *  @ccid_hc_{r,t}x_getsockopt: socket options specific to HC-receiver/sender
+ *  @ccid_hc_{r,t}x_setsockopt: socket options specific to HC-receiver/sender
  */
 struct ccid_operations {
 	unsigned char		ccid_id;
@@ -90,6 +91,14 @@ struct ccid_operations {
 						 const int optname, int len,
 						 u32 __user *optval,
 						 int __user *optlen);
+	int		(*ccid_hc_rx_setsockopt)(struct sock *sk,
+						 const int optname,
+						 u32 __user *optval,
+						 int optlen);
+	int		(*ccid_hc_tx_setsockopt)(struct sock *sk,
+						 const int optname,
+						 u32 __user *optval,
+						 int optlen);
 };
 
 extern struct ccid_operations ccid2_ops;
@@ -224,6 +233,16 @@ static inline int ccid_hc_rx_getsockopt(struct ccid *ccid, struct sock *sk,
 	return rc;
 }
 
+static inline int ccid_hc_rx_setsockopt(struct ccid *ccid, struct sock *sk,
+					const int optname, u32 __user *optval,
+					int optlen)
+{
+	int rc = -ENOPROTOOPT;
+	if (ccid->ccid_ops->ccid_hc_rx_setsockopt != NULL)
+		rc = ccid->ccid_ops->ccid_hc_rx_setsockopt(sk, optname, optval, optlen);
+	return rc;
+}
+
 static inline int ccid_hc_tx_getsockopt(struct ccid *ccid, struct sock *sk,
 					const int optname, int len,
 					u32 __user *optval, int __user *optlen)
@@ -232,6 +251,16 @@ static inline int ccid_hc_tx_getsockopt(struct ccid *ccid, struct sock *sk,
 	if (ccid->ccid_ops->ccid_hc_tx_getsockopt != NULL)
 		rc = ccid->ccid_ops->ccid_hc_tx_getsockopt(sk, optname, len,
 						 optval, optlen);
+	return rc;
+}
+
+static inline int ccid_hc_tx_setsockopt(struct ccid *ccid, struct sock *sk,
+					const int optname, u32  __user *optval,
+					int optlen)
+{
+	int rc = -ENOPROTOOPT;
+	if (ccid->ccid_ops->ccid_hc_tx_setsockopt != NULL)
+		rc = ccid->ccid_ops->ccid_hc_tx_setsockopt(sk, optname, optval, optlen);
 	return rc;
 }
 #endif /* _CCID_H */

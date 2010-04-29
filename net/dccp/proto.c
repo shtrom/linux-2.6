@@ -536,6 +536,12 @@ static int do_dccp_setsockopt(struct sock *sk, int level, int optname,
 	case DCCP_SOCKOPT_RECV_CSCOV:
 		err = dccp_setsockopt_cscov(sk, val, true);
 		break;
+	case 128 ... 191:
+		err = ccid_hc_rx_setsockopt(dp->dccps_hc_rx_ccid, sk, optname,
+					     (u32 __user *)optval, optlen);
+	case 192 ... 255:
+		err =  ccid_hc_tx_setsockopt(dp->dccps_hc_tx_ccid, sk, optname,
+					     (u32 __user *)optval, optlen);
 	default:
 		err = -ENOPROTOOPT;
 		break;
