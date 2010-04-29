@@ -652,6 +652,18 @@ prepare_for_next_time:
 	hc->rx_feedback	    = fbtype;
 }
 
+static int ccid3_hc_rx_parse_options(struct sock *sk, u8 packet_type,
+				     u8 option, u8 *optval, u8 optlen)
+{
+	struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
+	//__be32 opt_val;
+
+	switch (option) {
+	}
+
+	return 0;
+}
+
 static int ccid3_hc_rx_insert_options(struct sock *sk, struct sk_buff *skb)
 {
 	const struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
@@ -863,6 +875,7 @@ struct ccid_operations ccid3_ops = {
 	.ccid_hc_rx_obj_size	   = sizeof(struct ccid3_hc_rx_sock),
 	.ccid_hc_rx_init	   = ccid3_hc_rx_init,
 	.ccid_hc_rx_exit	   = ccid3_hc_rx_exit,
+	.ccid_hc_rx_parse_options  = ccid3_hc_rx_parse_options,
 	.ccid_hc_rx_insert_options = ccid3_hc_rx_insert_options,
 	.ccid_hc_rx_packet_recv	   = ccid3_hc_rx_packet_recv,
 	.ccid_hc_rx_get_info	   = ccid3_hc_rx_get_info,
