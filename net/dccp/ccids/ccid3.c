@@ -776,6 +776,64 @@ static int ccid3_hc_rx_getsockopt(struct sock *sk, const int optname, int len,
 	return 0;
 }
 
+static int ccid3_hc_tx_setsockopt(struct sock *sk, const int optname,
+				  u32 __user *optval, int optlen)
+{
+	struct ccid3_hc_tx_sock *hc = ccid3_hc_tx_sk(sk);
+	int val, err = 0;
+
+	/* Listen socks doesn't have a private CCID block */
+	if (sk->sk_state == DCCP_LISTEN)
+		return -EINVAL;
+
+	/* Options with no arguments */
+	switch (optname) {
+	}
+
+	if (optlen < (int)sizeof(int))
+		return -EINVAL;
+
+	if (get_user(val, (int __user *)optval))
+		return -EFAULT;
+
+	switch (optname) {
+	default:
+		return -ENOPROTOOPT;
+		break;
+	}
+
+	return err;
+}
+
+static int ccid3_hc_rx_setsockopt(struct sock *sk, const int optname,
+				  u32 __user *optval, int optlen)
+{
+	struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
+	int val, err = 0;
+
+	/* Listen socks doesn't have a private CCID block */
+	if (sk->sk_state == DCCP_LISTEN)
+		return -EINVAL;
+
+	/* Options with no arguments */
+	switch (optname) {
+	}
+
+	if (optlen < (int)sizeof(int))
+		return -EINVAL;
+
+	if (get_user(val, (int __user *)optval))
+		return -EFAULT;
+
+	switch (optname) {
+	default:
+		return -ENOPROTOOPT;
+		break;
+	}
+
+	return err;
+}
+
 struct ccid_operations ccid3_ops = {
 	.ccid_id		   = DCCPC_CCID3,
 	.ccid_name		   = "TCP-Friendly Rate Control",
@@ -796,6 +854,8 @@ struct ccid_operations ccid3_ops = {
 	.ccid_hc_tx_get_info	   = ccid3_hc_tx_get_info,
 	.ccid_hc_rx_getsockopt	   = ccid3_hc_rx_getsockopt,
 	.ccid_hc_tx_getsockopt	   = ccid3_hc_tx_getsockopt,
+	.ccid_hc_rx_setsockopt	   = ccid3_hc_rx_setsockopt,
+	.ccid_hc_tx_setsockopt	   = ccid3_hc_tx_setsockopt,
 };
 
 module_param(ccid3_osc_prev, bool, 0644);
