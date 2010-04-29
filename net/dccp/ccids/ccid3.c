@@ -372,7 +372,7 @@ static void ccid3_hc_tx_packet_sent(struct sock *sk, int more,
 static void ccid3_hc_tx_packet_recv(struct sock *sk, struct sk_buff *skb)
 {
 	struct ccid3_hc_tx_sock *hc = ccid3_hc_tx_sk(sk);
-	struct ccid3_options_received *opt_recv;
+	struct ccid3_hc_tx_options_received *opt_recv;
 	ktime_t now;
 	unsigned long t_nfb;
 	u32 pinv, r_sample;
@@ -489,7 +489,7 @@ static int ccid3_hc_tx_parse_options(struct sock *sk, unsigned char option,
 	int rc = 0;
 	const struct dccp_sock *dp = dccp_sk(sk);
 	struct ccid3_hc_tx_sock *hc = ccid3_hc_tx_sk(sk);
-	struct ccid3_options_received *opt_recv;
+	struct ccid3_hc_tx_options_received *opt_recv;
 	__be32 opt_val;
 
 	opt_recv = &hc->tx_options_received;
@@ -702,6 +702,7 @@ static void ccid3_hc_rx_send_feedback(struct sock *sk,
 static int ccid3_hc_rx_insert_options(struct sock *sk, struct sk_buff *skb)
 {
 	const struct ccid3_hc_rx_sock *hc;
+	struct dccp_sock *dp = dccp_sk(sk);
 	__be32 x_recv, pinv;
 
 	if (!(sk->sk_state == DCCP_OPEN || sk->sk_state == DCCP_PARTOPEN))
@@ -768,6 +769,7 @@ static u32 ccid3_first_li(struct sock *sk)
 static void ccid3_hc_rx_packet_recv(struct sock *sk, struct sk_buff *skb)
 {
 	struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
+	struct ccid3_hc_rx_options_received *opt_recv;
 	enum ccid3_fback_type do_feedback = CCID3_FBACK_NONE;
 	const u64 ndp = dccp_sk(sk)->dccps_options_received.dccpor_ndp;
 	const bool is_data_packet = dccp_data_packet(skb);
@@ -786,6 +788,8 @@ static void ccid3_hc_rx_packet_recv(struct sock *sk, struct sk_buff *skb)
 		}
 		goto update_records;
 	}
+
+	opt_recv = &hc->rx_options_received;
 
 	if (tfrc_rx_hist_duplicate(&hc->rx_hist, skb))
 		return; /* done receiving */
@@ -847,6 +851,24 @@ update_records:
 done_receiving:
 	if (do_feedback)
 		ccid3_hc_rx_send_feedback(sk, skb, do_feedback);
+}
+
+static int ccid3_hc_rx_parse_options(struct sock *sk, unsigned char option,
+				     unsigned char len, u16 idx,
+				     unsigned char *value)
+{
+	int rc = 0;
+	/* const struct dccp_sock *dp = dccp_sk(sk); */
+	struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
+	struct ccid3_hc_rx_options_received *opt_recv;
+	/* __be32 opt_val; */
+
+	opt_recv = &hc->rx_options_received;
+
+	switch (option) {
+	}
+
+	return rc;
 }
 
 static int ccid3_hc_rx_init(struct ccid *ccid, struct sock *sk)
@@ -983,6 +1005,7 @@ struct ccid_operations ccid3_ops = {
 	.ccid_hc_tx_packet_sent	   = ccid3_hc_tx_packet_sent,
 	.ccid_hc_tx_packet_recv	   = ccid3_hc_tx_packet_recv,
 	.ccid_hc_tx_parse_options  = ccid3_hc_tx_parse_options,
+	.ccid_hc_rx_parse_options  = ccid3_hc_rx_parse_options,
 	.ccid_hc_rx_obj_size	   = sizeof(struct ccid3_hc_rx_sock),
 	.ccid_hc_rx_init	   = ccid3_hc_rx_init,
 	.ccid_hc_rx_exit	   = ccid3_hc_rx_exit,

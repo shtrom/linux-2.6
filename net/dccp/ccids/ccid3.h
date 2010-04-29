@@ -57,12 +57,15 @@ enum ccid3_options {
 	TFRC_OPT_RECEIVE_RATE	 = 194,
 };
 
-struct ccid3_options_received {
+struct ccid3_hc_tx_options_received {
 	u64 ccid3or_seqno:48,
 	    ccid3or_loss_intervals_idx:16;
 	u16 ccid3or_loss_intervals_len;
 	u32 ccid3or_loss_event_rate;
 	u32 ccid3or_receive_rate;
+};
+
+struct ccid3_hc_rx_options_received {
 };
 
 /* TFRC sender states */
@@ -112,7 +115,7 @@ struct ccid3_hc_tx_sock {
 	ktime_t				tx_t_nom;
 	u32				tx_delta;
 	struct tfrc_tx_hist_entry	*tx_hist;
-	struct ccid3_options_received	tx_options_received;
+	struct ccid3_hc_tx_options_received	tx_options_received;
 };
 
 static inline struct ccid3_hc_tx_sock *ccid3_hc_tx_sk(const struct sock *sk)
@@ -157,6 +160,7 @@ struct ccid3_hc_rx_sock {
 	struct tfrc_loss_hist		rx_li_hist;
 	u16				rx_s;
 #define rx_pinv				rx_li_hist.i_mean
+	struct ccid3_hc_rx_options_received	rx_options_received;
 };
 
 static inline struct ccid3_hc_rx_sock *ccid3_hc_rx_sk(const struct sock *sk)
