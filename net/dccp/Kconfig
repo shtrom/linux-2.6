@@ -24,6 +24,27 @@ config INET_DCCP_DIAG
 	def_tristate y if (IP_DCCP = y && INET_DIAG = y)
 	def_tristate m
 
+config IP_DCCP_FREEZE
+	bool "Freeze-DCCP"
+	depends on EXPERIMENTAL
+	---help---
+	  Support for Freeze-DCCP to temporarily freeze the data flows.
+	  Options can be sent to freeze both sides' senders or restore the
+	  operation with a faster adaptation to the new conditions.
+	  This can be used e.g. when the a mobile node and predicts a
+	  disconnection to avoid losing packets.
+
+	  Currently not implemented in any CCID.
+
+	  If in doubt, say N.
+
+config IP_DCCP_FREEZE_DEBUG
+	bool "Freeze-DCCP debug messages"
+	depends on IP_DCCP_FREEZE
+	default n
+	help
+	  Support for debug messages for Freeze-DCCP (and CCIDs).
+
 source "net/dccp/ccids/Kconfig"
 
 menu "DCCP Kernel Hacking"

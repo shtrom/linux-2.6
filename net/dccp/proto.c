@@ -184,6 +184,9 @@ int dccp_init_sock(struct sock *sk, const __u8 ctl_sock_initialized)
 	dp->dccps_role		= DCCP_ROLE_UNDEFINED;
 	dp->dccps_service	= DCCP_SERVICE_CODE_IS_ABSENT;
 	dp->dccps_l_ack_ratio	= dp->dccps_r_ack_ratio = 1;
+#ifdef CONFIG_IP_DCCP_FREEZE
+	dp->dccps_signal_freeze = 0;
+#endif
 
 	dccp_init_xmit_timers(sk);
 
@@ -536,6 +539,14 @@ static int do_dccp_setsockopt(struct sock *sk, int level, int optname,
 	case DCCP_SOCKOPT_RECV_CSCOV:
 		err = dccp_setsockopt_cscov(sk, val, true);
 		break;
+#ifdef CONFIG_IP_DCCP_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		if (val == 0)
+			err = dccp_unfreeze(sk);
+		else
+			err = dccp_freeze(sk);
+		break;
+#endif
 	case 128 ... 191:
 		err = ccid_hc_rx_setsockopt(dp->dccps_hc_rx_ccid, sk, optname,
 					     (u32 __user *)optval, optlen);

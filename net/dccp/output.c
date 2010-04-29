@@ -266,7 +266,7 @@ void dccp_write_xmit(struct sock *sk, int block)
 				break;
 			} else
 				err = dccp_wait_for_ccid(sk, skb, err);
-			if (err && err != -EINTR)
+			if (err && err != -EINTR &&  err != -EAGAIN)
 				DCCP_BUG("err=%d after dccp_wait_for_ccid", err);
 		}
 
@@ -306,7 +306,8 @@ void dccp_write_xmit(struct sock *sk, int block)
 				DCCP_BUG("err=%d after ccid_hc_tx_packet_sent",
 					 err);
 		} else {
-			dccp_pr_debug("packet discarded due to err=%d\n", err);
+			if (err != -EAGAIN)
+				dccp_pr_debug("packet discarded due to err=%d\n", err);
 			kfree_skb(skb);
 		}
 	}
