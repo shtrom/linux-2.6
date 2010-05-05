@@ -87,7 +87,7 @@ static void tfrc_lh_calc_i_mean(struct tfrc_loss_hist *lh)
  * open loss interval I_0 increases, hence p = W_tot/max(I_tot0, I_tot1)
  * decreases, and thus there is no need to send renewed feedback.
  */
-void tfrc_lh_update_i_mean(struct tfrc_loss_hist *lh, struct sk_buff *skb)
+void tfrc_lh_update_i_mean(struct tfrc_loss_hist *lh, const struct sk_buff *skb)
 {
 	struct tfrc_loss_interval *cur = tfrc_lh_peek(lh);
 	s64 len;

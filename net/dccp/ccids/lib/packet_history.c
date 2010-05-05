@@ -166,7 +166,7 @@ static void tfrc_rx_hist_swap(struct tfrc_rx_hist *h, const u8 a, const u8 b)
  * with the index of `loss_count' holds the highest-received sequence number.
  * RTT sampling requires this information at ring[0] (tfrc_rx_hist_sample_rtt).
  */
-static inline void tfrc_rx_hist_resume_rtt_sampling(struct tfrc_rx_hist *h)
+void tfrc_rx_hist_resume_rtt_sampling(struct tfrc_rx_hist *h)
 {
 	__tfrc_rx_hist_swap(h, 0, tfrc_rx_hist_index(h, h->loss_count));
 	h->loss_count = h->loss_start = 0;
@@ -454,7 +454,7 @@ static int tfrc_rx_hist_alloc(struct tfrc_rx_hist *h)
 	return 0;
 }
 
-int tfrc_rx_hist_init(struct tfrc_rx_hist *h, struct sock *sk)
+int tfrc_rx_hist_init(struct tfrc_rx_hist *h, u64 seqno)
 {
 	if (tfrc_rx_hist_alloc(h))
 		return -ENOBUFS;
@@ -463,7 +463,7 @@ int tfrc_rx_hist_init(struct tfrc_rx_hist *h, struct sock *sk)
 	 * possible. Code using this must not use any other fields. The entry
 	 * will be overwritten once the CCID updates its received packets.
 	 */
-	tfrc_rx_hist_loss_prev(h)->tfrchrx_seqno = dccp_sk(sk)->dccps_gsr;
+	tfrc_rx_hist_loss_prev(h)->tfrchrx_seqno = seqno;
 	return 0;
 }
 

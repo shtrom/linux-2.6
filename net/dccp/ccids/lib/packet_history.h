@@ -192,7 +192,8 @@ extern bool tfrc_rx_congestion_event(struct tfrc_rx_hist *h,
 				     struct sock *sk);
 extern void tfrc_rx_hist_sample_rtt(struct tfrc_rx_hist *h,
 				    const struct sk_buff *skb);
-extern int  tfrc_rx_hist_init(struct tfrc_rx_hist *h, struct sock *sk);
+void tfrc_rx_hist_resume_rtt_sampling(struct tfrc_rx_hist *h);
+extern int  tfrc_rx_hist_init(struct tfrc_rx_hist *h, u64 seqno);
 extern void tfrc_rx_hist_purge(struct tfrc_rx_hist *h);
 
 #endif /* _DCCP_PKT_HIST_ */

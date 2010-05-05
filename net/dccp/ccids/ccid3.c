@@ -758,7 +758,7 @@ static int ccid3_hc_rx_init(struct ccid *ccid, struct sock *sk)
 	struct ccid3_hc_rx_sock *hc = ccid_priv(ccid);
 
 	tfrc_lh_init(&hc->rx_li_hist);
-	return tfrc_rx_hist_init(&hc->rx_hist, sk);
+	return tfrc_rx_hist_init(&hc->rx_hist, dccp_sk(sk)->dccps_gsr);
 }
 
 static void ccid3_hc_rx_exit(struct sock *sk)
