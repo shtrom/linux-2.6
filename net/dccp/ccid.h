@@ -72,6 +72,8 @@ struct ccid_operations {
 						  struct sk_buff *skb);
 	int		(*ccid_hc_tx_parse_options)(struct sock *sk, u8 pkt,
 						    u8 opt, u8 *val, u8 len);
+	int		(*ccid_hc_tx_insert_options)(struct sock *sk,
+						     struct sk_buff *skb);
 	int		(*ccid_hc_tx_send_packet)(struct sock *sk,
 						  struct sk_buff *skb);
 	void		(*ccid_hc_tx_packet_sent)(struct sock *sk,
@@ -228,6 +230,14 @@ static inline int ccid_hc_tx_parse_options(struct ccid *ccid, struct sock *sk,
 	if (ccid->ccid_ops->ccid_hc_tx_parse_options == NULL)
 		return 0;
 	return ccid->ccid_ops->ccid_hc_tx_parse_options(sk, pkt, opt, val, len);
+}
+
+static inline int ccid_hc_tx_insert_options(struct ccid *ccid, struct sock *sk,
+					    struct sk_buff *skb)
+{
+	if (ccid->ccid_ops->ccid_hc_tx_insert_options != NULL)
+		return ccid->ccid_ops->ccid_hc_tx_insert_options(sk, skb);
+	return 0;
 }
 
 /**

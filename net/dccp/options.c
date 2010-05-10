@@ -612,6 +612,11 @@ int dccp_insert_options(struct sock *sk, struct sk_buff *skb)
 			return -1;
 		dp->dccps_hc_rx_insert_options = 0;
 	}
+	if (dp->dccps_hc_tx_insert_options) {
+		if (ccid_hc_tx_insert_options(dp->dccps_hc_tx_ccid, sk, skb))
+			return -1;
+		dp->dccps_hc_tx_insert_options = 0;
+	}
 
 	if (dp->dccps_timestamp_echo != 0 &&
 	    dccp_insert_option_timestamp_echo(dp, NULL, skb))
