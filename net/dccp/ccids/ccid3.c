@@ -517,6 +517,20 @@ static int ccid3_hc_tx_parse_options(struct sock *sk, u8 packet_type,
 	return 0;
 }
 
+static int ccid3_hc_tx_insert_options(struct sock *sk, struct sk_buff *skb)
+{
+	struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
+	struct dccp_sock *dp = dccp_sk(sk);
+
+	if (!(sk->sk_state == DCCP_OPEN || sk->sk_state == DCCP_PARTOPEN))
+		return 0;
+
+	if (dccp_packet_without_ack(skb))
+		return 0;
+
+	return 0;
+}
+
 static int ccid3_hc_tx_init(struct ccid *ccid, struct sock *sk)
 {
 	struct ccid3_hc_tx_sock *hc = ccid_priv(ccid);
@@ -845,6 +859,7 @@ struct ccid_operations ccid3_ops = {
 	.ccid_hc_tx_probe	   = ccid3_hc_tx_probe,
 	.ccid_hc_tx_packet_recv	   = ccid3_hc_tx_packet_recv,
 	.ccid_hc_tx_parse_options  = ccid3_hc_tx_parse_options,
+	.ccid_hc_tx_insert_options = ccid3_hc_tx_insert_options,
 	.ccid_hc_rx_obj_size	   = sizeof(struct ccid3_hc_rx_sock),
 	.ccid_hc_rx_init	   = ccid3_hc_rx_init,
 	.ccid_hc_rx_exit	   = ccid3_hc_rx_exit,
