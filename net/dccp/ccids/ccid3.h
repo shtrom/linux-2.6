@@ -61,11 +61,43 @@
 # define TFRC_T_DELTA		   (USEC_PER_SEC / (2 * HZ))
 #endif
 
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE_DEBUG
+extern int ccid3_freeze_debug;
+#define ccid3_freeze_pr_debug(format, a...)	DCCP_PR_DEBUG(ccid3_freeze_debug, format, ##a)
+#else
+#define ccid3_freeze_pr_debug(format, a...)
+#endif
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+/* Variation in p to exit the probing state */
+# define FREEZE_DELTA_P		10
+
+struct ccid3_hc_rx_freeze_options {
+	u64 ccid3or_seqno:48,
+	    ccid3or_sender_freeze:16;
+};
+#endif
+
 enum ccid3_options {
 	TFRC_OPT_LOSS_EVENT_RATE = 192,
 	TFRC_OPT_LOSS_INTERVALS	 = 193,
 	TFRC_OPT_RECEIVE_RATE	 = 194,
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+	TFRC_OPT_UNFROZEN,
+	TFRC_OPT_RESTORING	 = 129,
+	TFRC_OPT_PROBING,
+#endif
 };
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+/* Freeze-TFRC sender states */
+enum ccid3_hc_tx_freeze_states {
+	TFRC_FREEZE_SSTATE_NORMAL = 0,
+	TFRC_FREEZE_SSTATE_FROZEN,
+	TFRC_FREEZE_SSTATE_RESTORING,
+	TFRC_FREEZE_SSTATE_PROBING,
+};
+#endif
 
 /**
  * struct ccid3_hc_tx_sock - CCID3 sender half-connection socket
@@ -86,6 +118,9 @@ enum ccid3_options {
  * @tx_t_ld:		  Time last doubled during slow start
  * @tx_t_nom:		  Nominal send time of next packet
  * @tx_hist:		  Packet history
+ * @tx_freeze_seqno:	  Last sequence when the freeze state has been changed
+ * @tx_freeze_state:	  Freeze-TFRC state
+ * @tx_freeze_x_recv:	  Xrecv before Freezing
  */
 struct ccid3_hc_tx_sock {
 	u64				tx_x;
@@ -104,6 +139,12 @@ struct ccid3_hc_tx_sock {
 	ktime_t				tx_t_ld;
 	ktime_t				tx_t_nom;
 	struct tfrc_tx_hist_entry	*tx_hist;
+#ifdef	CONFIG_IP_DCCP_CCID3_FREEZE
+	enum ccid3_hc_tx_freeze_states	tx_freeze_state;
+	u64				tx_freeze_seqno;
+	u64				tx_freeze_x_recv;
+	u32				tx_freeze_p;
+#endif
 };
 
 static inline struct ccid3_hc_tx_sock *ccid3_hc_tx_sk(const struct sock *sk)
@@ -121,6 +162,19 @@ enum ccid3_fback_type {
 	CCID3_FBACK_PARAM_CHANGE
 };
 
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+/* Freeze-TFRC receiver states */
+enum ccid3_hc_rx_freeze_states {
+	TFRC_FREEZE_RSTATE_NORMAL = 0,
+	TFRC_FREEZE_RSTATE_SIGNAL_FREEZE,
+	TFRC_FREEZE_RSTATE_SIGNAL_UNFREEZE,
+	TFRC_FREEZE_RSTATE_RESTORATION,
+	TFRC_FREEZE_RSTATE_RECOVERY1,
+	TFRC_FREEZE_RSTATE_RECOVERY2,
+	TFRC_FREEZE_RSTATE_PROBED,
+};
+#endif
+
 /**
  * struct ccid3_hc_rx_sock - CCID3 receiver half-connection socket
  * @rx_last_counter:	     Tracks window counter (RFC 4342, 8.1)
@@ -130,6 +184,10 @@ enum ccid3_fback_type {
  * @rx_hist:		     Packet history (loss detection + RTT sampling)
  * @rx_li_hist:		     Loss Interval database
  * @rx_pinv:		     Inverse of Loss Event Rate (RFC 4342, sec. 8.5)
+ * @rx_freeze_options:       Freeze-TFRC-specific options received
+ * @tx_freeze_seqno:	     Last sequence when the freeze state has been changed
+ * @rx_freeze_state:	     Freeze-TFRC state
+ * @rx_freeze_restoration_end: Time at which restoration should end
  */
 struct ccid3_hc_rx_sock {
 	u8				rx_last_counter:4;
@@ -139,6 +197,12 @@ struct ccid3_hc_rx_sock {
 	struct tfrc_rx_hist		rx_hist;
 	struct tfrc_loss_hist		rx_li_hist;
 #define rx_pinv				rx_li_hist.i_mean
+#ifdef	CONFIG_IP_DCCP_CCID3_FREEZE
+	struct ccid3_hc_rx_freeze_options rx_freeze_options;
+	u64				rx_freeze_seqno;
+	enum ccid3_hc_rx_freeze_states	rx_freeze_state;
+	ktime_t 			rx_freeze_restoration_end;
+#endif
 };
 
 static inline struct ccid3_hc_rx_sock *ccid3_hc_rx_sk(const struct sock *sk)
@@ -147,5 +211,39 @@ static inline struct ccid3_hc_rx_sock *ccid3_hc_rx_sk(const struct sock *sk)
 	BUG_ON(hcrx == NULL);
 	return hcrx;
 }
+
+#ifdef CONFIG_IP_DCCP_CCID3_FREEZE
+int ccid3_rx_freeze(struct ccid3_hc_rx_sock *hcrx, u64 seqno);
+int ccid3_rx_unfreeze(struct ccid3_hc_rx_sock *hcrx, u64 seqno);
+int ccid3_rx_sender_restoring(struct ccid3_hc_rx_sock *hcrx, u64 seqno);
+int ccid3_rx_check_restoration_finished(struct ccid3_hc_rx_sock *hcrx, u64 seqno);
+int ccid3_rx_sender_probing(struct ccid3_hc_rx_sock *hcrx, u64 seqno);
+int ccid3_rx_end_probing(struct ccid3_hc_rx_sock *hcrx, u64 seqno);
+
+static inline void ccid3_rx_freeze_set(struct ccid3_hc_rx_sock *hcrx,
+		enum ccid3_hc_rx_freeze_states val, u64 seqno) {
+	ccid3_freeze_pr_debug("changing to mode %d", val);
+	hcrx->rx_freeze_state = val;
+	hcrx->rx_freeze_seqno = seqno;
+}
+static inline enum ccid3_hc_rx_freeze_states ccid3_rx_freeze_get(const struct ccid3_hc_rx_sock *hcrx)
+{
+	return hcrx->rx_freeze_state;
+}
+
+int ccid3_tx_freeze(struct ccid3_hc_tx_sock *hctx, u64 seqno);
+int ccid3_tx_unfreeze(struct ccid3_hc_tx_sock *hctx, u64 seqno);
+int ccid3_tx_receiver_unfrozen(struct ccid3_hc_tx_sock *hctx, u64 seqno);
+
+static inline void ccid3_tx_freeze_set(struct ccid3_hc_tx_sock *hctx,
+		enum ccid3_hc_tx_freeze_states val, u64 seqno){
+	hctx->tx_freeze_state = val;
+	hctx->tx_freeze_seqno = seqno;
+}
+static inline enum ccid3_hc_tx_freeze_states ccid3_tx_freeze_get(const struct ccid3_hc_tx_sock *hctx)
+{
+	return hctx->tx_freeze_state;
+}
+#endif
 
 #endif /* _DCCP_CCID3_H_ */

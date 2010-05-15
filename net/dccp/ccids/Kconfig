@@ -104,6 +104,12 @@ config IP_DCCP_TFRC_LIB
 config IP_DCCP_TFRC_DEBUG
 	def_bool y if IP_DCCP_CCID3_DEBUG
 
+config IP_DCCP_CCID3_FREEZE
+	def_bool y if IP_DCCP_FREEZE
+
+config IP_DCCP_CCID3_FREEZE_DEBUG
+	def_bool y if IP_DCCP_FREEZE_DEBUG
+
 config IP_DCCP_CCID0
 	bool "CCID-ZERO (UDP-like) sample kernel module"
 	def_bool n
