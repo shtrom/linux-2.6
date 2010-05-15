@@ -44,6 +44,7 @@ struct tcp_info;
  *  @ccid_hc_tx_packet_sent: does accounting for packets in flight by HC-sender
  *  @ccid_hc_tx_probe: CCID-dependent hook for dccp_probe
  *  @ccid_hc_{r,t}x_get_info: INET_DIAG information for HC-receiver/sender
+ *  @ccid_hc_{r,t}x_get_freeze_state: current freeze state
  *  @ccid_hc_{r,t}x_getsockopt: socket options specific to HC-receiver/sender
  *  @ccid_hc_{r,t}x_setsockopt: socket options specific to HC-receiver/sender
  */
@@ -84,6 +85,10 @@ struct ccid_operations {
 					       struct tcp_info *info);
 	void		(*ccid_hc_tx_get_info)(struct sock *sk,
 					       struct tcp_info *info);
+#ifdef CONFIG_IP_DCCP_FREEZE
+	enum dccp_freeze_states	(*ccid_hc_rx_get_freeze_state)(struct sock *sk);
+	enum dccp_freeze_states	(*ccid_hc_tx_get_freeze_state)(struct sock *sk);
+#endif
 	int		(*ccid_hc_rx_getsockopt)(struct sock *sk,
 						 const int optname, int len,
 						 u32 __user *optval,
@@ -166,6 +171,9 @@ enum ccid_dequeueing_decision {
 	CCID_PACKET_DELAY_MAX =		 0x0FFFF,  /* maximum delay in msecs  */
 	CCID_PACKET_DELAY =		 0x10000,  /* CCID msec-delay mode */
 	CCID_PACKET_WILL_DEQUEUE_LATER = 0x20000,  /* CCID autonomous mode */
+#ifdef CONFIG_IP_DCCP_FREEZE
+	CCID_PACKET_FROZEN =		 0x30000,  /* Packet not sent as the sender is frozen */
+#endif
 	CCID_PACKET_ERR =		 0xF0000,  /* error condition */
 };
 
@@ -273,6 +281,20 @@ static inline void ccid_hc_tx_get_info(struct ccid *ccid, struct sock *sk,
 	if (ccid->ccid_ops->ccid_hc_tx_get_info != NULL)
 		ccid->ccid_ops->ccid_hc_tx_get_info(sk, info);
 }
+
+#ifdef CONFIG_IP_DCCP_FREEZE
+static inline enum dccp_freeze_states ccid_hc_rx_get_freeze_state(struct ccid *ccid, struct sock *sk) {
+	if (ccid->ccid_ops->ccid_hc_rx_get_freeze_state != NULL)
+		return ccid->ccid_ops->ccid_hc_rx_get_freeze_state(sk);
+	return DCCP_FREEZE_NORMAL;
+}
+
+static inline enum dccp_freeze_states ccid_hc_tx_get_freeze_state(struct ccid *ccid, struct sock *sk) {
+	if (ccid->ccid_ops->ccid_hc_tx_get_freeze_state != NULL)
+		return ccid->ccid_ops->ccid_hc_tx_get_freeze_state(sk);
+	return DCCP_FREEZE_NORMAL;
+}
+#endif
 
 static inline int ccid_hc_rx_getsockopt(struct ccid *ccid, struct sock *sk,
 					const int optname, int len,

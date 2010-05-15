@@ -50,6 +50,17 @@ extern int dccp_debug;
 #define dccp_debug(format, a...)
 #endif
 
+#ifdef CONFIG_IP_DCCP_FREEZE_DEBUG
+extern int dccp_freeze_debug;
+#define dccp_freeze_pr_debug(format, a...)	  DCCP_PR_DEBUG(dccp_freeze_debug, format, ##a)
+#define dccp_freeze_pr_debug_cat(format, a...)   DCCP_PRINTK(dccp_freeze_debug, format, ##a)
+#define dccp_freeze_debug(fmt, a...)		  dccp_freeze_pr_debug_cat(KERN_DEBUG fmt, ##a)
+#else
+#define dccp_freeze_pr_debug(format, a...)
+#define dccp_freeze_pr_debug_cat(format, a...)
+#define dccp_freeze_debug(format, a...)
+#endif
+
 extern struct inet_hashinfo dccp_hashinfo;
 
 extern struct percpu_counter dccp_orphan_count;
@@ -518,6 +529,10 @@ extern int dccp_insert_option_timestamp(struct sock *sk,
 extern int dccp_insert_option(struct sock *sk, struct sk_buff *skb,
 			       unsigned char option,
 			       const void *value, unsigned char len);
+#ifdef CONFIG_IP_DCCP_FREEZE
+/* Number of packets to send to signal the peer to freeze */
+# define DCCP_FREEZE_SIGNAL_PACKETS	5
+#endif
 
 #ifdef CONFIG_SYSCTL
 extern int dccp_sysctl_init(void);

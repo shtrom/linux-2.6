@@ -185,6 +185,9 @@ int dccp_init_sock(struct sock *sk, const __u8 ctl_sock_initialized)
 	dp->dccps_role		= DCCP_ROLE_UNDEFINED;
 	dp->dccps_service	= DCCP_SERVICE_CODE_IS_ABSENT;
 	dp->dccps_tx_qlen	= sysctl_dccp_tx_qlen;
+#ifdef CONFIG_IP_DCCP_FREEZE
+	dp->dccps_signal_freeze = 0;
+#endif
 
 	dccp_init_xmit_timers(sk);
 
@@ -494,6 +497,29 @@ static int dccp_setsockopt_ccid(struct sock *sk, int type,
 	return rc;
 }
 
+
+#ifdef CONFIG_IP_DCCP_FREEZE
+static int dccp_setsockopt_freeze_ccids(struct sock *sk, int optname,
+		u32 __user *optval, unsigned int optlen) {
+	int errrx = 0, errtx = 0;
+	struct dccp_sock *dp = dccp_sk(sk);
+
+	errrx = ccid_hc_rx_setsockopt(dp->dccps_hc_rx_ccid, sk,
+			optname, (u32 *) optval, optlen);
+
+	errtx = ccid_hc_tx_setsockopt(dp->dccps_hc_rx_ccid, sk,
+			optname, (u32 *) optval, optlen);
+
+	if (errrx < 0 || errtx < 0)
+		DCCP_WARN("Could not fully change freeze state: errrx=%d, errtx=%d\n",
+				errrx, errtx);
+	if (errrx < 0 && errtx < 0) {
+		return -EFAULT;
+	}
+	return 0;
+}
+#endif
+
 static int do_dccp_setsockopt(struct sock *sk, int level, int optname,
 		char __user *optval, unsigned int optlen)
 {
@@ -554,6 +580,13 @@ static int do_dccp_setsockopt(struct sock *sk, int level, int optname,
 	case DCCP_SOCKOPT_GET_ECN_BITS:
 		dp->dccps_get_ecn_bits = (val != 0);
 		break;
+#ifdef CONFIG_IP_DCCP_FREEZE
+	case DCCP_SOCKOPT_FREEZE:
+		err = dccp_setsockopt_freeze_ccids(sk, optname, (u32 __user *)optval, optlen);
+		if (err == 0)
+			dp->dccps_signal_freeze = DCCP_FREEZE_SIGNAL_PACKETS;
+		break;
+#endif
 	case 128 ... 191:
 		err = ccid_hc_rx_setsockopt(dp->dccps_hc_rx_ccid, sk, optname,
 					     (u32 __user *)optval, optlen);
@@ -794,7 +827,12 @@ int dccp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	lock_sock(sk);
 
-	if (dccp_qpolicy_full(sk)) {
+	if (dccp_qpolicy_full(sk) 
+#ifdef CONFIG_IP_DCCP_FREEZE
+			|| (dp->dccps_hc_tx_ccid != NULL &&
+				ccid_hc_tx_get_freeze_state(dp->dccps_hc_tx_ccid, sk) == DCCP_FREEZE_FROZEN)
+#endif
+			) {
 		rc = -EAGAIN;
 		goto out_release;
 	}
@@ -1145,6 +1183,14 @@ module_param(dccp_debug, bool, 0644);
 MODULE_PARM_DESC(dccp_debug, "Enable debug messages");
 
 EXPORT_SYMBOL_GPL(dccp_debug);
+#endif
+
+#ifdef CONFIG_IP_DCCP_FREEZE_DEBUG
+int dccp_freeze_debug;
+module_param(dccp_freeze_debug, bool, 0644);
+MODULE_PARM_DESC(dccp_freeze_debug, "Enable debug messages for Freeze-DCCP");
+
+EXPORT_SYMBOL_GPL(dccp_freeze_debug);
 #endif
 
 static int __init dccp_init(void)

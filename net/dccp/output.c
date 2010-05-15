@@ -339,6 +339,9 @@ void dccp_flush_write_queue(struct sock *sk, long *time_budget)
 		case CCID_PACKET_SEND_AT_ONCE:
 			dccp_xmit_packet(sk);
 			break;
+#ifdef CONFIG_IP_DCCP_FREEZE
+		case CCID_PACKET_FROZEN:
+#endif
 		case CCID_PACKET_ERR:
 			skb_dequeue(&sk->sk_write_queue);
 			kfree_skb(skb);
@@ -365,6 +368,11 @@ void dccp_write_xmit(struct sock *sk)
 		case CCID_PACKET_SEND_AT_ONCE:
 			dccp_xmit_packet(sk);
 			break;
+#ifdef CONFIG_IP_DCCP_FREEZE
+		case CCID_PACKET_FROZEN:
+			dccp_qpolicy_drop(sk, skb);
+			break;
+#endif
 		case CCID_PACKET_ERR:
 			dccp_qpolicy_drop(sk, skb);
 			dccp_pr_debug("packet discarded due to err=%d\n", rc);

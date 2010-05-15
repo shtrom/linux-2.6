@@ -232,6 +232,15 @@ int dccp_parse_options(struct sock *sk, struct dccp_request_sock *dreq,
 						     pkt_type, opt, value, len))
 				goto out_invalid_option;
 			break;
+#ifdef CONFIG_IP_DCCP_FREEZE
+		case DCCPO_FREEZE:
+		case DCCPO_UNFREEZE:
+			ccid_hc_tx_parse_options(dp->dccps_hc_tx_ccid, sk,
+						     pkt_type, opt, value, len);
+			ccid_hc_rx_parse_options(dp->dccps_hc_rx_ccid, sk,
+						     pkt_type, opt, value, len);
+			break;
+#endif
 		default:
 			DCCP_CRIT("DCCP(%p): option %d(len=%d) not "
 				  "implemented, ignoring", sk, opt, len);

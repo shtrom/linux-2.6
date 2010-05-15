@@ -24,6 +24,24 @@ config INET_DCCP_DIAG
 	def_tristate y if (IP_DCCP = y && INET_DIAG = y)
 	def_tristate m
 
+config IP_DCCP_FREEZE
+	bool "Freeze-DCCP"
+	depends on EXPERIMENTAL
+	---help---
+	  Support for Freeze-DCCP to temporarily freeze the data flows.
+	  Options can be sent to freeze both sides' senders or restore the
+	  operation with a faster adaptation to the new conditions.
+	  This can be used e.g. when the a mobile node and predicts a
+	  disconnection to avoid losing packets.
+
+	  Currently only implemented for TFRC (CCID3) [0].
+
+	  [0] Olivier Mehani, Roksana Boreli and Thierry Ernst. Analysis of
+	  TFRC in disconnected scenarios and performance improvements with
+	  Freeze-DCCP. In ACM MobiArch 2009.
+
+	  If in doubt, say N.
+
 source "net/dccp/ccids/Kconfig"
 
 menu "DCCP Kernel Hacking"
@@ -38,6 +56,13 @@ config IP_DCCP_DEBUG
 	  by setting the parameter dccp_debug of the `dccp' module to 0 or 1.
 
 	  Just say N.
+
+config IP_DCCP_FREEZE_DEBUG
+	bool "Freeze-DCCP debug messages"
+	depends on IP_DCCP_FREEZE && IP_DCCP_DEBUG
+	default n
+	help
+	  Support for debug messages for Freeze-DCCP (and CCIDs).
 
 config NET_DCCPPROBE
 	tristate "DCCP connection probing"

@@ -165,6 +165,9 @@ enum {
 	DCCPO_TIMESTAMP_ECHO = 42,
 	DCCPO_ELAPSED_TIME = 43,
 	DCCPO_MAX = 45,
+	/* Experimental Freeze-DCCP/TFRC options */
+	DCCPO_FREEZE = 120,
+	DCCPO_UNFREEZE = 121,
 	DCCPO_MIN_RX_CCID_SPECIFIC = 128,	/* from sender to receiver */
 	DCCPO_MAX_RX_CCID_SPECIFIC = 191,
 	DCCPO_MIN_TX_CCID_SPECIFIC = 192,	/* from receiver to sender */
@@ -236,8 +239,11 @@ enum dccp_packet_dequeueing_policy {
 #define DCCP_SOCKOPT_QPOLICY_ID		16
 #define DCCP_SOCKOPT_QPOLICY_TXQLEN	17
 #define DCCP_SOCKOPT_GET_ECN_BITS	18
+#define DCCP_SOCKOPT_FREEZE		120  /* setsockopt only */
 #define DCCP_SOCKOPT_CCID_RX_INFO	128
+#define DCCP_SOCKOPT_CCID_RX_FREEZE	129 /* getsockopt only */
 #define DCCP_SOCKOPT_CCID_TX_INFO	192
+#define DCCP_SOCKOPT_CCID_TX_FREEZE	193 /* getsockopt only */
 
 /* maximum number of services provided on the same listening port */
 #define DCCP_SERVICE_LIST_MAX_LEN      32
@@ -453,6 +459,11 @@ static inline int dccp_list_has_service(const struct dccp_service_list *sl,
 	return 0;
 }
 
+enum dccp_freeze_states {
+	DCCP_FREEZE_NORMAL = 0,
+	DCCP_FREEZE_FROZEN,
+};
+
 struct dccp_ackvec;
 
 /**
@@ -500,6 +511,7 @@ struct dccp_ackvec;
  * @dccps_xmitlet - tasklet scheduled by the TX CCID to dequeue data packets
  * @dccps_xmit_timer - used by the TX CCID to delay sending (rate-based pacing)
  * @dccps_syn_rtt - RTT sample from Request/Response exchange (in usecs)
+ * @dccps_signal_freeze - Number of outgoing packets allowed to signal a freezing event
  */
 struct dccp_sock {
 	/* inet_connection_sock has to be the first member of dccp_sock */
@@ -546,6 +558,7 @@ struct dccp_sock {
 	__u8				dccps_sync_scheduled:1;
 	struct tasklet_struct		dccps_xmitlet;
 	struct timer_list		dccps_xmit_timer;
+	__u8				dccps_signal_freeze;
 };
 
 static inline struct dccp_sock *dccp_sk(const struct sock *sk)
