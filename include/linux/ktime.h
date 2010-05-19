@@ -95,6 +95,23 @@ static inline ktime_t ktime_set(const long secs, const unsigned long nsecs)
 #define ktime_add(lhs, rhs) \
 		({ (ktime_t){ .tv64 = (lhs).tv64 + (rhs).tv64 }; })
 
+/**
+ * ktime_compare - Compares two ktime_t variables
+ *
+ * Return val:
+ * lhs < rhs: < 0
+ * lhs == rhs: 0
+ * lhs > rhs: > 0
+ */
+static inline int ktime_compare(const ktime_t lhs, const ktime_t rhs)
+{
+	if (lhs.tv64 < rhs.tv64)
+		return -1;
+	if (lhs.tv64 > rhs.tv64)
+		return 1;
+	return 0;
+}
+
 /*
  * Add a ktime_t variable and a scalar nanosecond value.
  * res = kt + nsval:
@@ -195,6 +212,23 @@ static inline ktime_t ktime_add(const ktime_t add1, const ktime_t add2)
 		res.tv64 += (u32)-NSEC_PER_SEC;
 
 	return res;
+}
+
+/**
+ * ktime_compare - Compares two ktime_t variables
+ *
+ * Return val:
+ * lhs < rhs: < 0
+ * lhs == rhs: 0
+ * lhs > rhs: > 0
+ */
+static inline int ktime_compare(const ktime_t lhs, const ktime_t rhs)
+{
+	if (lhs.tv.sec < rhs.tv.sec)
+		return -1;
+	if (lhs.tv.sec > rhs.tv.sec)
+		return 1;
+	return lhs.tv.nsec - rhs.tv.nsec;
 }
 
 /**
